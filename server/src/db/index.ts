@@ -12,7 +12,7 @@ const dataDir = resolve(__dirname, '../../data');
 const wasmPath = resolve(__dirname, '../../sql-wasm.wasm');
 
 let db: Database | null = null;
-let dbReady: Promise<Database>;
+let dbReady: Promise<Database> = initializeDatabase();
 
 // Initialize database asynchronously
 async function initializeDatabase(): Promise<Database> {
@@ -87,7 +87,7 @@ async function initializeDatabase(): Promise<Database> {
       amount DECIMAL(12, 2) NOT NULL,
       balance_after DECIMAL(12, 2) NOT NULL,
       status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
-      reference_number VARCHAR(30) UNIQUE NOT NULL,
+      reference_number VARCHAR(30) NOT NULL,
       counterparty_account_id INTEGER,
       metadata JSON,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -277,7 +277,9 @@ function wrapStatement(stmt: Statement) {
   return {
     get: async (...params: any[]) => {
       await dbReady;
-      const result = originalGet(...params);
+      // Handle both .get([a, b, c]) and .get(a, b, c) calling conventions
+      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+      const result = originalGet(flatParams);
       if (!result || result.length === 0) return undefined;
       const columns = stmt.getColumnNames();
       const obj: Record<string, any> = {};
@@ -288,24 +290,30 @@ function wrapStatement(stmt: Statement) {
     },
     all: async (...params: any[]) => {
       await dbReady;
+      // Handle both .all([a, b, c]) and .all(a, b, c) calling conventions
+      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
       const results: any[] = [];
-      while (true) {
-        const row = originalGet(...params);
-        if (!row || row.length === 0) break;
+      // Bind parameters first
+      if (flatParams.length > 0) {
+        stmt.bind(flatParams);
+      }
+      while (stmt.step()) {
+        const row = stmt.get();
         const columns = stmt.getColumnNames();
         const obj: Record<string, any> = {};
         columns.forEach((col, i) => {
           obj[col] = row[i];
         });
         results.push(obj);
-        // Reset the statement for next iteration
-        stmt.reset();
       }
+      stmt.reset();
       return results;
     },
     run: async (...params: any[]) => {
       await dbReady;
-      const result = originalRun(...params);
+      // Handle both .run([a, b, c]) and .run(a, b, c) calling conventions
+      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+      const result = originalRun(flatParams);
       const lastIdResult = db!.exec('SELECT last_insert_rowid() as id');
       return {
         lastInsertRowid: lastIdResult[0]?.values[0]?.[0] || 0,
@@ -315,12 +323,12 @@ function wrapStatement(stmt: Statement) {
   };
 }
 
-async function transaction<T>(fn: () => T): Promise<T> {
+async function transaction<T>(fn: () => Promise<T>): Promise<T> {
   await dbReady;
   if (!db) throw new Error('Database not initialized');
   db.exec('BEGIN TRANSACTION');
   try {
-    const result = fn();
+    const result = await fn();
     db.exec('COMMIT');
     return result;
   } catch (error) {

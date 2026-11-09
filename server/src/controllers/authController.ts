@@ -19,7 +19,8 @@ function generateBackupCodes(count: number = 8): string[] {
 export const login = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { username, password, otp } = req.body as LoginRequest;
 
-  const user = await (await database.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1')).get(username) as
+  const stmt = await database.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1');
+  const user = await stmt.get(username) as
     | (JWTPayload & { password_hash: string; otp_secret: string | null; otp_enabled: boolean })
     | undefined;
 
