@@ -95,13 +95,22 @@ export async function initializeDatabase(): Promise<Client> {
 }
 
 async function initializeClient(): Promise<Client> {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+  const rawUrl = process.env.TURSO_DATABASE_URL;
+  const rawAuthToken = process.env.TURSO_AUTH_TOKEN;
+
+  let url = rawUrl?.trim().replace(/^["']|["']$/g, '').replace(/\/$/, '');
+  const authToken = rawAuthToken?.trim().replace(/^["']|["']$/g, '');
+
+  if (url && !url.includes('://') && !url.startsWith('file:')) {
+    url = `libsql://${url}`;
+  }
 
   if (process.env.VERCEL && !url) {
     throw new Error('TURSO_DATABASE_URL must be configured for Vercel deployments.');
   }
-  if (url?.startsWith('libsql://') && !authToken) {
+
+  const isRemote = Boolean(url && (url.startsWith('libsql://') || url.startsWith('https://') || url.startsWith('http://')));
+  if (isRemote && !authToken) {
     throw new Error('TURSO_AUTH_TOKEN must be configured for a remote Turso database.');
   }
 
@@ -116,7 +125,17 @@ async function initializeClient(): Promise<Client> {
   });
 
   try {
-    await client.executeMultiple(schema);
+    const checkTable = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
+    if (checkTable.rows.length === 0) {
+      const statements = schema
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const statement of statements) {
+        await client.execute(statement);
+      }
+    }
+
     const userColumns = await client.execute('PRAGMA table_info(users)');
     if (!userColumns.rows.some((column) => column.name === 'transactions_blocked')) {
       await client.execute('ALTER TABLE users ADD COLUMN transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE');
@@ -127,8 +146,16 @@ async function initializeClient(): Promise<Client> {
       VALUES ('transaction_block_message', 'Transactions are currently disabled for your account. Please contact support.')
     `);
     return client;
-  } catch (error) {
+  } catch (error: any) {
     client.close();
+    console.error('Failed to initialize database client:', {
+      message: error?.message,
+      code: error?.code,
+      cause: error?.cause?.message || error?.cause,
+      status: error?.cause?.status,
+      hasUrl: Boolean(url),
+      hasToken: Boolean(authToken),
+    });
     throw error;
   }
 }
@@ -278,8 +305,10 @@ type SqlExecutor = (statement: { sql: string; args: InArgs }) => Promise<ResultS
 function toArgs(params: unknown[]): InArgs {
   const values = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
   return values.map((value) => {
+    if (value === undefined || value === null) {
+      return null;
+    }
     if (
-      value === null ||
       typeof value === 'string' ||
       typeof value === 'number' ||
       typeof value === 'bigint' ||
@@ -351,7 +380,13 @@ export const database: DatabaseSession & {
   },
   exec: async (sql) => {
     const client = await initializeDatabase();
-    await client.executeMultiple(sql);
+    const statements = sql
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    for (const statement of statements) {
+      await client.execute(statement);
+    }
   },
   close: async () => {
     if (initialization) {

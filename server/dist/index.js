@@ -6,7 +6,10 @@ import routes from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const rawFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = rawFrontendUrl.replace(/\/$/, '');
+// Enable proxy trusting behind Vercel reverse proxy
+app.set('trust proxy', 1);
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -15,13 +18,25 @@ app.use(helmet({
             fontSrc: ["'self'", 'https://fonts.gstatic.com'],
             imgSrc: ["'self'", 'data:', 'https:'],
             scriptSrc: ["'self'"],
-            connectSrc: ["'self'", FRONTEND_URL],
+            connectSrc: ["'self'", FRONTEND_URL, 'https://*.vercel.app'],
         },
     },
     crossOriginEmbedderPolicy: false,
 }));
 app.use(cors({
-    origin: FRONTEND_URL,
+    origin: (origin, callback) => {
+        if (!origin)
+            return callback(null, true);
+        const normalized = origin.replace(/\/$/, '');
+        if (normalized === FRONTEND_URL ||
+            normalized === 'https://chqse-bank.vercel.app' ||
+            normalized.endsWith('.vercel.app') ||
+            normalized === 'http://localhost:5173' ||
+            normalized === 'http://localhost:3000') {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -32,6 +47,7 @@ const limiter = rateLimit({
     message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later' } },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
 });
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -39,6 +55,7 @@ const authLimiter = rateLimit({
     message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later' } },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
 });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -50,9 +67,11 @@ app.use('/api', limiter);
 app.use('/api', routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Frontend URL: ${FRONTEND_URL}`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`Frontend URL: ${FRONTEND_URL}`);
+    });
+}
 export default app;

@@ -12,6 +12,9 @@ export class AppError extends Error {
 }
 export function errorHandler(err, req, res, next) {
     console.error('Error:', err);
+    if (err?.cause) {
+        console.error('Error cause:', err.cause);
+    }
     if (err instanceof AppError) {
         const response = {
             success: false,

@@ -17,6 +17,9 @@ export class AppError extends Error {
 
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): void {
   console.error('Error:', err);
+  if ((err as any)?.cause) {
+    console.error('Error cause:', (err as any).cause);
+  }
 
   if (err instanceof AppError) {
     const response: ApiResponse<null> = {
