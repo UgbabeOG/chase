@@ -17,7 +17,8 @@
     "lint": "npm run lint --workspaces",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "db:init": "npm run db:init --workspace=server",
-    "db:seed": "npm run db:seed --workspace=server"
+    "db:seed": "npm run db:seed --workspace=server",
+    "db:reset": "npm run db:reset --workspace=server"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

@@ -5,18 +5,21 @@ A premium, high-fidelity banking web application that replicates the Chase Bank 
 ## Features
 
 ### Client Features
+
 - **Secure Login Interface** - Username/password authentication with optional 2FA (TOTP)
 - **Dashboard** - Real-time balances for checking and savings accounts
 - **Recent Transactions** - Detailed transaction history with filtering and pagination
 - **Transfer Money** - Simulate bank transfers between accounts
 
 ### Admin Features
+
 - **User Management** - Create, read, update, delete users
 - **Balance Control** - Modify user account balances
 - **Transaction Injection** - Manually create, edit, or delete transactions
 - **Transaction Monitoring** - View all transactions across all users
 
 ### Technical Features
+
 - **JWT Authentication** - Access tokens (15 min) + Refresh tokens (7 days)
 - **Two-Factor Authentication** - TOTP with QR code setup and backup codes
 - **SQLite Database** - Embedded database with WAL mode for performance
@@ -27,6 +30,7 @@ A premium, high-fidelity banking web application that replicates the Chase Bank 
 ## Tech Stack
 
 ### Frontend
+
 - React 18 + TypeScript
 - Vite 5 (build tool)
 - Tailwind CSS 3 (styling)
@@ -37,6 +41,7 @@ A premium, high-fidelity banking web application that replicates the Chase Bank 
 - date-fns (date formatting)
 
 ### Backend
+
 - Node.js 20 + TypeScript
 - Express 4 (web framework)
 - Better-SQLite3 (database)
@@ -50,6 +55,7 @@ A premium, high-fidelity banking web application that replicates the Chase Bank 
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 20+
 - npm 9+
 
@@ -90,6 +96,7 @@ After running `npm run db:seed`:
 
 | Role | Username | Password |
 |------|----------|----------|
+
 | Admin | admin | admin123 |
 | User | johndoe | password123 |
 
@@ -133,6 +140,7 @@ chase-bank-clone/
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/login` - User login
 - `POST /api/auth/login/2fa` - 2FA verification
 - `POST /api/auth/logout` - User logout
@@ -143,16 +151,19 @@ chase-bank-clone/
 - `POST /api/auth/disable-2fa` - Disable 2FA
 
 ### Accounts
+
 - `GET /api/accounts` - List user accounts
 - `GET /api/accounts/:id` - Get account details
 - `GET /api/accounts/:id/balance` - Get real-time balance
 
 ### Transactions
+
 - `GET /api/transactions` - List transactions (paginated, filterable)
 - `GET /api/transactions/:id` - Get transaction details
 - `POST /api/transactions/transfer` - Initiate transfer
 
 ### Admin (requires admin role)
+
 - `GET /api/admin/users` - List all users
 - `GET /api/admin/users/:id` - Get user details
 - `POST /api/admin/users` - Create user

@@ -6,7 +6,6 @@ import { TransactionTable, TransactionFilters } from '../../components/data-disp
 import { Button, Card, Badge, Select, SkeletonCard } from '../../components/ui';
 import { formatRelativeTime } from '../../utils';
 import { TRANSACTION_CATEGORIES } from '../../utils/constants';
-import { useState } from 'react';
 
 export const Transactions: React.FC = () => {
   const { accounts } = useAccounts();

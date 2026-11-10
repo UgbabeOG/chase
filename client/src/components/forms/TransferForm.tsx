@@ -69,7 +69,7 @@ export const TransferForm: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {submitStatus === 'success && (
+      {submitStatus === 'success' && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3" role="alert">
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
           <p className="text-sm text-green-700">{successMessage}</p>
