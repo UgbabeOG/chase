@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createClient, type InValue } from '@libsql/client';
 import initSqlJs from 'sql.js';
 import { existsSync, readFileSync } from 'fs';

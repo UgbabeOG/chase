@@ -1,43 +1,14 @@
-import initSqlJs from 'sql.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { createClient } from '@libsql/client';
+import { existsSync, mkdirSync } from 'fs';
+import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const dbPath = resolve(__dirname, '../../data/chase.db');
 const dataDir = resolve(__dirname, '../../data');
-const wasmPath = resolve(__dirname, '../../sql-wasm.wasm');
-let db = null;
-let dbReady = initializeDatabase();
-// Initialize database asynchronously
-async function initializeDatabase() {
-    if (db)
-        return db;
-    console.log('Initializing database...');
-    console.log('WASM path:', wasmPath);
-    // Ensure data directory exists
-    if (!existsSync(dataDir)) {
-        mkdirSync(dataDir, { recursive: true });
-    }
-    // Load SQL.js
-    const SQL = await initSqlJs({
-        locateFile: () => wasmPath
-    });
-    // Try to load existing database
-    if (existsSync(dbPath)) {
-        console.log('Loading existing database...');
-        const fileBuffer = readFileSync(dbPath);
-        db = new SQL.Database(fileBuffer);
-    }
-    else {
-        console.log('Creating new database...');
-        db = new SQL.Database();
-    }
-    // Enable foreign keys
-    db.exec('PRAGMA foreign_keys = ON;');
-    // Create tables
-    db.exec(`
+let initialization = null;
+const schema = `
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username VARCHAR(50) UNIQUE NOT NULL,
@@ -49,6 +20,7 @@ async function initializeDatabase() {
       first_name VARCHAR(50) NOT NULL,
       last_name VARCHAR(50) NOT NULL,
       phone VARCHAR(20),
+      transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_login DATETIME,
@@ -98,81 +70,96 @@ async function initializeDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key VARCHAR(100) PRIMARY KEY,
+      setting_value TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
-  `);
-    console.log('Database schema created successfully.');
-    // Save database to file
-    saveDatabase();
-    return db;
+  `;
+export async function initializeDatabase() {
+    if (!initialization) {
+        initialization = initializeClient().catch((error) => {
+            initialization = null;
+            throw error;
+        });
+    }
+    return initialization;
 }
-// Start database initialization immediately
-dbReady = initializeDatabase();
-function saveDatabase() {
-    if (!db)
-        return;
-    const data = db.export();
-    writeFileSync(dbPath, Buffer.from(data));
-    console.log('Database saved to:', dbPath);
+async function initializeClient() {
+    const url = process.env.TURSO_DATABASE_URL;
+    const authToken = process.env.TURSO_AUTH_TOKEN;
+    if (process.env.VERCEL && !url) {
+        throw new Error('TURSO_DATABASE_URL must be configured for Vercel deployments.');
+    }
+    if (url?.startsWith('libsql://') && !authToken) {
+        throw new Error('TURSO_AUTH_TOKEN must be configured for a remote Turso database.');
+    }
+    if (!url && !existsSync(dataDir)) {
+        mkdirSync(dataDir, { recursive: true });
+    }
+    const client = createClient({
+        url: url || `file:${dbPath}`,
+        ...(authToken ? { authToken } : {}),
+        intMode: 'number',
+    });
+    try {
+        await client.executeMultiple(schema);
+        const userColumns = await client.execute('PRAGMA table_info(users)');
+        if (!userColumns.rows.some((column) => column.name === 'transactions_blocked')) {
+            await client.execute('ALTER TABLE users ADD COLUMN transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE');
+        }
+        await client.execute(`
+      INSERT OR IGNORE INTO app_settings (setting_key, setting_value)
+      VALUES ('transaction_block_message', 'Transactions are currently disabled for your account. Please contact support.')
+    `);
+        return client;
+    }
+    catch (error) {
+        client.close();
+        throw error;
+    }
 }
 async function seedDatabase() {
-    await dbReady;
     console.log('Seeding database...');
-    const userCount = db.exec('SELECT COUNT(*) as count FROM users');
-    if (userCount[0]?.values[0][0] > 0) {
+    const userCount = await (await database.prepare('SELECT COUNT(*) as count FROM users')).get();
+    if (userCount.count > 0) {
         console.log('Database already seeded, skipping...');
         return;
     }
     const passwordHash = bcrypt.hashSync('password123', 12);
     const adminPasswordHash = bcrypt.hashSync('admin123', 12);
-    const insertUser = createStatement(`
+    const insertUser = `
     INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, otp_enabled)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-    const insertAccount = createStatement(`
+  `;
+    const insertAccount = `
     INSERT INTO accounts (user_id, account_type, account_number, routing_number, balance, available_balance, nickname)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-    const insertTransaction = createStatement(`
+  `;
+    const insertTransaction = `
     INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  `;
     // Create admin user
-    const adminResult = await wrapStatement(insertUser).run([
-        'admin',
-        'admin@chase.com',
-        adminPasswordHash,
-        'admin',
-        'Admin',
-        'User',
-        '555-0100',
-        0
-    ]);
+    const adminResult = await (await database.prepare(insertUser)).run('admin', 'admin@chase.com', adminPasswordHash, 'admin', 'Admin', 'User', '555-0100', 0);
     const adminId = adminResult.lastInsertRowid;
     // Create demo user
-    const userResult = await wrapStatement(insertUser).run([
-        'johndoe',
-        'john.doe@email.com',
-        passwordHash,
-        'user',
-        'John',
-        'Doe',
-        '555-0199',
-        0
-    ]);
+    const userResult = await (await database.prepare(insertUser)).run('johndoe', 'john.doe@email.com', passwordHash, 'user', 'John', 'Doe', '555-0199', 0);
     const userId = userResult.lastInsertRowid;
     // Create accounts for admin
-    const adminCheckingResult = await wrapStatement(insertAccount).run([adminId, 'checking', '0000000001', '021000021', 50000.00, 50000.00, 'Admin Checking']);
+    const adminCheckingResult = await (await database.prepare(insertAccount)).run(adminId, 'checking', '0000000001', '021000021', 50000.00, 50000.00, 'Admin Checking');
     const adminCheckingId = adminCheckingResult.lastInsertRowid;
-    const adminSavingsResult = await wrapStatement(insertAccount).run([adminId, 'savings', '0000000002', '021000021', 100000.00, 100000.00, 'Admin Savings']);
+    const adminSavingsResult = await (await database.prepare(insertAccount)).run(adminId, 'savings', '0000000002', '021000021', 100000.00, 100000.00, 'Admin Savings');
     const adminSavingsId = adminSavingsResult.lastInsertRowid;
     // Create accounts for demo user
-    const checkingResult = await wrapStatement(insertAccount).run([userId, 'checking', '1234567890', '021000021', 5432.18, 5432.18, 'Primary Checking']);
+    const checkingResult = await (await database.prepare(insertAccount)).run(userId, 'checking', '1234567890', '021000021', 5432.18, 5432.18, 'Primary Checking');
     const checkingId = checkingResult.lastInsertRowid;
-    const savingsResult = await wrapStatement(insertAccount).run([userId, 'savings', '0987654321', '021000021', 12345.67, 12345.67, 'Emergency Savings']);
+    const savingsResult = await (await database.prepare(insertAccount)).run(userId, 'savings', '0987654321', '021000021', 12345.67, 12345.67, 'Emergency Savings');
     const savingsId = savingsResult.lastInsertRowid;
     // Generate reference number
     const generateRef = () => 'REF' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -195,18 +182,7 @@ async function seedDatabase() {
         { accountId: checkingId, type: 'credit', category: 'Payroll', description: 'DIRECT DEPOSIT - ACME CORP', amount: 3500.00, balanceAfter: 8060.67, status: 'completed', ref: generateRef() },
     ];
     for (const tx of transactions) {
-        await wrapStatement(insertTransaction).run([
-            tx.accountId,
-            tx.type,
-            tx.category,
-            tx.description,
-            tx.amount,
-            tx.balanceAfter,
-            tx.status,
-            tx.ref,
-            tx.counterpartyId || null,
-            '{}'
-        ]);
+        await (await database.prepare(insertTransaction)).run(tx.accountId, tx.type, tx.category, tx.description, tx.amount, tx.balanceAfter, tx.status, tx.ref, tx.counterpartyId || null, '{}');
     }
     // Seed transactions for demo user savings account
     const savingsTransactions = [
@@ -214,113 +190,88 @@ async function seedDatabase() {
         { accountId: savingsId, type: 'credit', category: 'Transfer', description: 'Transfer from Checking ****7890', amount: 500.00, balanceAfter: 12858.01, status: 'completed', ref: generateRef(), counterpartyId: checkingId },
     ];
     for (const tx of savingsTransactions) {
-        await wrapStatement(insertTransaction).run([
-            tx.accountId,
-            tx.type,
-            tx.category,
-            tx.description,
-            tx.amount,
-            tx.balanceAfter,
-            tx.status,
-            tx.ref,
-            tx.counterpartyId || null,
-            '{}'
-        ]);
+        await (await database.prepare(insertTransaction)).run(tx.accountId, tx.type, tx.category, tx.description, tx.amount, tx.balanceAfter, tx.status, tx.ref, tx.counterpartyId || null, '{}');
     }
-    // Save database after seeding
-    saveDatabase();
     console.log('Demo data seeded successfully.');
     console.log('Admin user: admin / admin123');
     console.log('Demo user: johndoe / password123');
 }
-function createStatement(sql) {
-    if (!db)
-        throw new Error('Database not initialized');
-    return db.prepare(sql);
+function toArgs(params) {
+    const values = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+    return values.map((value) => {
+        if (value === null ||
+            typeof value === 'string' ||
+            typeof value === 'number' ||
+            typeof value === 'bigint' ||
+            typeof value === 'boolean' ||
+            value instanceof Date ||
+            value instanceof Uint8Array) {
+            return value;
+        }
+        throw new TypeError(`Unsupported database parameter type: ${typeof value}`);
+    });
 }
-function wrapStatement(stmt) {
-    const originalGet = stmt.get.bind(stmt);
-    const originalRun = stmt.run.bind(stmt);
+function rowToObject(columns, row) {
+    return Object.fromEntries(columns.map((column, index) => [column, row[index]]));
+}
+function statementFor(execute, sql) {
+    const executeWithParams = (params) => execute({ sql, args: toArgs(params) });
     return {
         get: async (...params) => {
-            await dbReady;
-            // Handle both .get([a, b, c]) and .get(a, b, c) calling conventions
-            const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-            const result = originalGet(flatParams);
-            if (!result || result.length === 0)
-                return undefined;
-            const columns = stmt.getColumnNames();
-            const obj = {};
-            columns.forEach((col, i) => {
-                obj[col] = result[i];
-            });
-            return obj;
+            const result = await executeWithParams(params);
+            return result.rows[0] ? rowToObject(result.columns, result.rows[0]) : undefined;
         },
         all: async (...params) => {
-            await dbReady;
-            // Handle both .all([a, b, c]) and .all(a, b, c) calling conventions
-            const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-            const results = [];
-            // Bind parameters first
-            if (flatParams.length > 0) {
-                stmt.bind(flatParams);
-            }
-            while (stmt.step()) {
-                const row = stmt.get();
-                const columns = stmt.getColumnNames();
-                const obj = {};
-                columns.forEach((col, i) => {
-                    obj[col] = row[i];
-                });
-                results.push(obj);
-            }
-            stmt.reset();
-            return results;
+            const result = await executeWithParams(params);
+            return result.rows.map((row) => rowToObject(result.columns, row));
         },
         run: async (...params) => {
-            await dbReady;
-            // Handle both .run([a, b, c]) and .run(a, b, c) calling conventions
-            const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-            const result = originalRun(flatParams);
-            const lastIdResult = db.exec('SELECT last_insert_rowid() as id');
+            const result = await executeWithParams(params);
             return {
-                lastInsertRowid: lastIdResult[0]?.values[0]?.[0] || 0,
-                changes: result ? 1 : 0
+                lastInsertRowid: Number(result.lastInsertRowid ?? 0),
+                changes: result.rowsAffected,
             };
         },
     };
 }
-async function transaction(fn) {
-    await dbReady;
-    if (!db)
-        throw new Error('Database not initialized');
-    db.exec('BEGIN TRANSACTION');
-    try {
-        const result = await fn();
-        db.exec('COMMIT');
-        return result;
-    }
-    catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-    }
+async function prepareOn(execute, sql) {
+    return statementFor(execute, sql);
 }
-// Export the database interface with async methods
+const databaseSession = (execute) => ({
+    prepare: async (sql) => prepareOn(execute, sql),
+});
 export const database = {
     prepare: async (sql) => {
-        await dbReady;
-        const stmt = createStatement(sql);
-        return wrapStatement(stmt);
+        const client = await initializeDatabase();
+        return prepareOn((statement) => client.execute(statement), sql);
+    },
+    transaction: async (fn) => {
+        const client = await initializeDatabase();
+        const transaction = await client.transaction('write');
+        try {
+            const result = await fn(databaseSession((statement) => transaction.execute(statement)));
+            await transaction.commit();
+            return result;
+        }
+        catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+        finally {
+            transaction.close();
+        }
     },
     exec: async (sql) => {
-        await dbReady;
-        return db.exec(sql);
+        const client = await initializeDatabase();
+        await client.executeMultiple(sql);
     },
-    transaction,
     close: async () => {
-        await dbReady;
-        db?.close();
-    }
+        if (initialization) {
+            const client = await initialization;
+            client.close();
+            initialization = null;
+        }
+    },
 };
-export { initializeDatabase, seedDatabase, saveDatabase, createStatement, wrapStatement, transaction };
+export { seedDatabase };
 export default database;

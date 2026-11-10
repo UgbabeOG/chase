@@ -94,15 +94,32 @@ npm run start
 
 The root `vercel.json` configures two services: the Vite client (`client`) and Express API (`server`). Requests under `/api/*` go to the API; all other paths go to the client. The client uses the same-origin `/api` path, so no service binding is needed.
 
-The API requires a persistent Turso/libSQL database in Vercel. Configure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as server-service environment variables; do not commit database credentials. For local development, the API uses `server/data/chase.db` unless `TURSO_DATABASE_URL` is set.
+The API requires a persistent Turso/libSQL database in Vercel. Add these variables to the Vercel project's **Production** environment:
 
-To copy the existing local SQLite records into a newly-created, empty Turso database, set those variables in your local shell and run:
+- `TURSO_DATABASE_URL` — the URL of the existing Turso database.
+- `TURSO_AUTH_TOKEN` — the authentication token for that database.
+
+The server reads these values at runtime; they do not belong in `vercel.json` or any `VITE_*` client variable. From the repository root, link this checkout to the intended Vercel project, then add each variable using the CLI's interactive prompt:
+
+```bash
+npx vercel login
+npx vercel link
+npx vercel env add TURSO_DATABASE_URL --environment production
+npx vercel env add TURSO_AUTH_TOKEN --environment production
+npx vercel deploy --prod
+```
+
+Enter each value only at the CLI prompt; do not put secrets in command arguments, source files, or shell history. These production credentials should not be added to Preview deployments. If Preview deployments are needed, give them a separate Turso database and add its credentials to the Preview environment.
+
+For local development, the API uses `server/data/chase.db` unless `TURSO_DATABASE_URL` is set. The one-time migration command loads `server/.env`:
+
+To copy local SQLite records into a newly-created, empty Turso database, set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in `server/.env`, then run:
 
 ```bash
 npm run db:migrate:turso --workspace=server
 ```
 
-The migration refuses to import if the target already contains users, accounts, transactions, or sessions. It preserves those tables' records and imports existing transaction policy settings. Do not run `npm run db:reset` against a production database.
+The migration refuses to import if the target already contains users, accounts, transactions, or sessions. It preserves those tables' records and imports existing transaction policy settings. The existing Turso database has already been populated; do not rerun this migration or run `npm run db:reset` against it. Do not commit `.env` files; if credentials have been committed or shared, rotate them.
 
 ## Demo Credentials
 

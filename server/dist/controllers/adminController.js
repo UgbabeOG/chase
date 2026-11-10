@@ -24,7 +24,7 @@ export const getUsers = asyncHandler(async (req, res) => {
     const countStmt = await database.prepare(`SELECT COUNT(*) as total FROM users ${whereClause}`);
     const total = (await countStmt.get(...params)).total;
     const usersStmt = await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users
     ${whereClause}
     ORDER BY created_at DESC
@@ -40,10 +40,44 @@ export const getUsers = asyncHandler(async (req, res) => {
     };
     res.json(response);
 });
+export const getAllAccounts = asyncHandler(async (req, res) => {
+    const accounts = await (await database.prepare(`
+    SELECT a.*, u.username
+    FROM accounts a
+    JOIN users u ON u.id = a.user_id
+    WHERE a.is_active = 1
+    ORDER BY u.username, a.account_type
+  `)).all();
+    const response = { success: true, data: accounts };
+    res.json(response);
+});
+export const getTransactionPolicy = asyncHandler(async (req, res) => {
+    const setting = await (await database.prepare('SELECT setting_value FROM app_settings WHERE setting_key = ?')).get('transaction_block_message');
+    const response = {
+        success: true,
+        data: {
+            blockedMessage: setting?.setting_value ?? 'Transactions are currently disabled for your account. Please contact support.',
+        },
+    };
+    res.json(response);
+});
+export const updateTransactionPolicy = asyncHandler(async (req, res) => {
+    const { blockedMessage } = req.body;
+    await (await database.prepare(`
+    INSERT INTO app_settings (setting_key, setting_value)
+    VALUES (?, ?)
+    ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+  `)).run('transaction_block_message', blockedMessage);
+    const response = {
+        success: true,
+        data: { blockedMessage },
+    };
+    res.json(response);
+});
 export const getUser = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const user = await (await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
   `)).get(id);
     if (!user) {
@@ -76,7 +110,7 @@ export const createUser = asyncHandler(async (req, res) => {
            (?, 'savings', ?, '021000021', 0, 0, 'Savings')
   `)).run(userId, checkingNumber, userId, savingsNumber);
     const user = await (await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
   `)).get(userId);
     const response = {
@@ -87,7 +121,10 @@ export const createUser = asyncHandler(async (req, res) => {
 });
 export const updateUser = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { email, firstName, lastName, phone, role, isActive } = req.body;
+    if (!id) {
+        throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+    const { email, firstName, lastName, phone, role, isActive, transactionsBlocked } = req.body;
     const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(id);
     if (!user) {
         throw new AppError('USER_NOT_FOUND', 'User not found', 404);
@@ -124,18 +161,44 @@ export const updateUser = asyncHandler(async (req, res) => {
         updates.push('is_active = ?');
         params.push(isActive ? 1 : 0);
     }
+    if (transactionsBlocked !== undefined) {
+        updates.push('transactions_blocked = ?');
+        params.push(transactionsBlocked ? 1 : 0);
+    }
     if (updates.length > 0) {
         updates.push('updated_at = CURRENT_TIMESTAMP');
         params.push(id);
         await (await database.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)).run(...params);
     }
     const updatedUser = await (await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
   `)).get(id);
     const response = {
         success: true,
         data: updatedUser,
+    };
+    res.json(response);
+});
+export const updateUserTwoFactor = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { enabled, secret } = req.body;
+    const user = await (await database.prepare('SELECT id, otp_secret FROM users WHERE id = ?')).get(id);
+    if (!user) {
+        throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+    const nextSecret = secret ?? (enabled ? user.otp_secret : null);
+    if (enabled && !nextSecret) {
+        throw new AppError('2FA_SECRET_REQUIRED', 'Provide an authenticator secret before enabling two-factor authentication', 400);
+    }
+    await (await database.prepare(`
+    UPDATE users
+    SET otp_enabled = ?, otp_secret = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `)).run(enabled ? 1 : 0, nextSecret, id);
+    const response = {
+        success: true,
+        data: { otpEnabled: enabled },
     };
     res.json(response);
 });
@@ -185,12 +248,12 @@ export const createTransaction = asyncHandler(async (req, res) => {
     const newAvailableBalance = account.available_balance + amount;
     const referenceNumber = generateReferenceNumber();
     const transactionStatus = status || 'completed';
-    await database.transaction(async () => {
+    await database.transaction(async (transaction) => {
         if (transactionStatus === 'completed') {
-            await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
+            await (await transaction.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
                 .run(newBalance, newAvailableBalance, accountId);
         }
-        await (await database.prepare(`
+        await (await transaction.prepare(`
       INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)).run(accountId, type, category || null, description, amount, transactionStatus === 'completed' ? newBalance : account.balance, transactionStatus, referenceNumber, counterpartyAccountId || null, JSON.stringify(metadata || {}));
@@ -260,6 +323,9 @@ export const getAllTransactions = asyncHandler(async (req, res) => {
 });
 export const updateTransaction = asyncHandler(async (req, res) => {
     const { id } = req.params;
+    if (!id) {
+        throw new AppError('TRANSACTION_NOT_FOUND', 'Transaction not found', 404);
+    }
     const { type, category, description, amount, status, counterpartyAccountId, metadata } = req.body;
     const transaction = await (await database.prepare('SELECT * FROM transactions WHERE id = ?')).get(id);
     if (!transaction) {

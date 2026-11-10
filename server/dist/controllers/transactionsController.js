@@ -82,6 +82,11 @@ export const transfer = asyncHandler(async (req, res) => {
         throw new AppError('UNAUTHORIZED', 'Not authenticated', 401);
     }
     const { fromAccountId, toAccountNumber, amount, description } = req.body;
+    const user = await (await database.prepare('SELECT transactions_blocked FROM users WHERE id = ?')).get(req.user.userId);
+    if (user?.transactions_blocked) {
+        const setting = await (await database.prepare('SELECT setting_value FROM app_settings WHERE setting_key = ?')).get('transaction_block_message');
+        throw new AppError('TRANSACTIONS_BLOCKED', setting?.setting_value ?? 'Transactions are currently disabled for your account. Please contact support.', 403);
+    }
     if (amount <= 0) {
         throw new AppError('INVALID_AMOUNT', 'Transfer amount must be positive', 400);
     }
@@ -108,16 +113,16 @@ export const transfer = asyncHandler(async (req, res) => {
     const newFromAvailable = fromAccount.available_balance - amount;
     const newToBalance = toAccount.balance + amount;
     const newToAvailable = toAccount.available_balance + amount;
-    await database.transaction(async () => {
-        await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
+    await database.transaction(async (transaction) => {
+        await (await transaction.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
             .run(newFromBalance, newFromAvailable, fromAccount.id);
-        await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
+        await (await transaction.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
             .run(newToBalance, newToAvailable, toAccount.id);
-        await (await database.prepare(`
+        await (await transaction.prepare(`
       INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)).run(fromAccount.id, 'transfer_out', 'Transfer', description || `Transfer to ${toAccount.nickname || 'Account'} ****${toAccount.account_number.slice(-4)}`, -amount, newFromBalance, 'completed', referenceNumber, toAccount.id, JSON.stringify({ toAccountId: toAccount.id, toAccountNumber: toAccount.account_number }));
-        await (await database.prepare(`
+        await (await transaction.prepare(`
       INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)).run(toAccount.id, 'transfer_in', 'Transfer', description || `Transfer from ${fromAccount.nickname || 'Account'} ****${fromAccount.account_number.slice(-4)}`, amount, newToBalance, 'completed', referenceNumber, fromAccount.id, JSON.stringify({ fromAccountId: fromAccount.id, fromAccountNumber: fromAccount.account_number }));
