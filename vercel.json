@@ -14,8 +14,7 @@
       "root": "server",
       "framework": "express",
       "buildCommand": "npm run build",
-      "entrypoint": "dist/index.js",
-      "runtime": "nodejs20"
+      "entrypoint": "dist/index.js"
     }
   },
   "rewrites": [
