@@ -92,7 +92,7 @@ npm run start
 
 ### Vercel Deployment
 
-The root `vercel.json` configures two services: the Vite client (`client`) and Express API (`server`). Requests under `/api/*` go to the API; all other paths go to the client. The client uses the same-origin `/api` path, so no service binding is needed.
+The root `vercel.json` configures two services: the Vite client (`client`) and Express API (`server`). Requests under `/api/*` go to the API; all other paths go to the client. The client rewrites extensionless paths such as `/login` to the SPA entry point while leaving asset paths untouched. The client uses the same-origin `/api` path, so no service binding is needed.
 
 The API requires a persistent Turso/libSQL database in Vercel. Add these variables to the Vercel project's **Production** environment:
 

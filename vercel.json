@@ -6,15 +6,19 @@
       "framework": "vite",
       "buildCommand": "npm run build",
       "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/((?!.*\\.).*)",
+          "destination": "/"
+        }
+      ],
       "bindings": [
         { "type": "service", "service": "server", "format": "url", "env": "SERVER_URL" }
       ]
     },
     "server": {
       "root": "server",
-      "framework": "express",
-      "buildCommand": "npm run build",
-      "entrypoint": "src/index.ts"
+      "framework": "express"
     }
   },
   "rewrites": [
