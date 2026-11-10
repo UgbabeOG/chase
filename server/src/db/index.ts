@@ -118,9 +118,32 @@ async function initializeClient(): Promise<Client> {
     mkdirSync(dataDir, { recursive: true });
   }
 
+  let urlInfo = { protocol: '', host: '' };
+  try {
+    const parsed = new URL(url ? (url.startsWith('libsql://') ? url.replace('libsql://', 'https://') : url) : 'http://localhost');
+    urlInfo = { protocol: parsed.protocol, host: parsed.host };
+  } catch {}
+
+  const customFetch: typeof fetch = async (input, init) => {
+    const resp = await fetch(input, init);
+    if (!resp.ok) {
+      try {
+        const clone = resp.clone();
+        const text = await clone.text();
+        console.error('Turso HTTP Error details:', {
+          status: resp.status,
+          statusText: resp.statusText,
+          body: text,
+        });
+      } catch {}
+    }
+    return resp;
+  };
+
   const client = createClient({
     url: url || `file:${dbPath}`,
     ...(authToken ? { authToken } : {}),
+    fetch: isRemote ? customFetch : undefined,
     intMode: 'number',
   });
 
@@ -153,8 +176,9 @@ async function initializeClient(): Promise<Client> {
       code: error?.code,
       cause: error?.cause?.message || error?.cause,
       status: error?.cause?.status,
-      hasUrl: Boolean(url),
-      hasToken: Boolean(authToken),
+      urlHost: urlInfo.host,
+      tokenLength: authToken?.length,
+      isJwt: Boolean(authToken?.startsWith('ey')),
     });
     throw error;
   }
