@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { database } from '../db/index.js';
-import { AuthRequest, LoginRequest, Verify2FARequest, JWTPayload, ApiResponse } from '../types/index.js';
+import { AuthRequest, LoginRequest, Verify2FARequest, UserWithSecrets, ApiResponse } from '../types/index.js';
 import { generateAccessToken, generateRefreshToken, hashToken, verifyRefreshToken, AppError, asyncHandler } from '../middleware/index.js';
 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
@@ -20,9 +20,7 @@ export const login = asyncHandler(async (req: AuthRequest, res: Response): Promi
   const { username, password, otp } = req.body as LoginRequest;
 
   const stmt = await database.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1');
-  const user = await stmt.get(username) as
-    | (JWTPayload & { password_hash: string; otp_secret: string | null; otp_enabled: boolean })
-    | undefined;
+  const user = await stmt.get(username) as UserWithSecrets | undefined;
 
   if (!user) {
     throw new AppError('INVALID_CREDENTIALS', 'Invalid username or password', 401);
@@ -92,9 +90,7 @@ export const login = asyncHandler(async (req: AuthRequest, res: Response): Promi
 export const login2FA = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { username, password, otp } = req.body as LoginRequest;
 
-  const user = await (await database.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1')).get(username) as
-    | (JWTPayload & { password_hash: string; otp_secret: string | null; otp_enabled: boolean })
-    | undefined;
+  const user = await (await database.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1')).get(username) as UserWithSecrets | undefined;
 
   if (!user || !user.otp_enabled) {
     throw new AppError('INVALID_CREDENTIALS', 'Invalid username or password', 401);
@@ -244,9 +240,7 @@ export const setup2FA = asyncHandler(async (req: AuthRequest, res: Response): Pr
     throw new AppError('UNAUTHORIZED', 'Not authenticated', 401);
   }
 
-  const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(req.user.userId) as
-    | (JWTPayload & { otp_secret: string | null; otp_enabled: boolean })
-    | undefined;
+  const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(req.user.userId) as UserWithSecrets | undefined;
 
   if (!user) {
     throw new AppError('USER_NOT_FOUND', 'User not found', 404);
@@ -289,9 +283,7 @@ export const verify2FA = asyncHandler(async (req: AuthRequest, res: Response): P
     throw new AppError('OTP_REQUIRED', 'Authentication code required', 400);
   }
 
-  const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(req.user.userId) as
-    | (JWTPayload & { otp_secret: string | null; otp_enabled: boolean })
-    | undefined;
+  const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(req.user.userId) as UserWithSecrets | undefined;
 
   if (!user || !user.otp_secret) {
     throw new AppError('2FA_NOT_SETUP', 'Two-factor authentication not set up', 400);
@@ -332,9 +324,7 @@ export const disable2FA = asyncHandler(async (req: AuthRequest, res: Response): 
     throw new AppError('PASSWORD_REQUIRED', 'Password required to disable 2FA', 400);
   }
 
-  const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(req.user.userId) as
-    | (JWTPayload & { password_hash: string; otp_enabled: boolean })
-    | undefined;
+  const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(req.user.userId) as UserWithSecrets | undefined;
 
   if (!user) {
     throw new AppError('USER_NOT_FOUND', 'User not found', 404);

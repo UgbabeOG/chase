@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Shield, Smartphone, CreditCard, Users, Lock, Globe, Building2, Award, TrendingUp } from 'lucide-react';
+import { ArrowRight, Shield, Smartphone, CreditCard, Users, Lock, Globe, Building2, Award, TrendingUp, ChevronRight, Check } from 'lucide-react';
 import { ROUTES } from '../utils/constants';
 
 const features = [
@@ -49,36 +49,69 @@ const products = [
     title: 'Checking Accounts',
     description: 'Everyday banking with no monthly fees, direct deposit, and instant transfers.',
     cta: 'Open Account',
+    image: '/images/banner-img-paragon-cs-1440px.jpg',
   },
   {
     icon: Award,
     title: 'Savings Accounts',
     description: 'Competitive APY with automatic savings tools and no minimum balance.',
     cta: 'Start Saving',
+    image: '/images/cb-banner-img-stay-connected-800x800px-square.jpg',
   },
   {
     icon: TrendingUp,
     title: 'Investments',
     description: 'Self-directed and managed portfolios with commission-free trades.',
     cta: 'Invest Now',
+    image: '/images/guide-to-alternative-investments-what-they-are-and-how-they-work-jpma-hero.jpg',
   },
   {
     icon: CreditCard,
     title: 'Credit Cards',
     description: 'Earn cash back, travel rewards, or premium perks on every purchase.',
     cta: 'Compare Cards',
+    image: '/images/banner-on-lok-1440x810px.jpg',
   },
   {
     icon: Smartphone,
     title: 'Mobile App',
     description: 'Bank on the go with mobile deposit, bill pay, and spending insights.',
     cta: 'Download',
+    image: '/images/cb-banner-img-connect-lp-800px-square.jpg',
   },
   {
     icon: Users,
     title: 'Small Business',
     description: 'Business checking, lending, and merchant services to help you grow.',
     cta: 'Learn More',
+    image: '/images/cb-img-quick-links-cb-lp-490x870px-vertical.jpg',
+  },
+];
+
+const solutions = [
+  {
+    title: 'Cash Flow Management',
+    description: 'Optimize working capital with integrated receivables, payables, and liquidity solutions.',
+    icon: TrendingUp,
+    image: '/images/banner-img-paragon-cs-1440px.jpg',
+  },
+  {
+    title: 'Global Trade & Receivables',
+    description: 'Navigate international markets with letters of credit, documentary collections, and trade financing.',
+    icon: Globe,
+    image: '/images/cb-img-quick-links-cb-lp-490x870px-vertical.jpg',
+  },
+  {
+    title: 'Digital Banking Platform',
+    description: 'Unified dashboard for payments, reporting, and account management across all your entities.',
+    icon: Smartphone,
+    image: '/images/cb-banner-img-connect-lp-800px-square.jpg',
+  },
+  {
+    title: 'Strategic Advisory',
+    description: 'Dedicated relationship managers and industry specialists for capital markets and M&A guidance.',
+    icon: Users,
+    image: '/images/banner-on-lok-1440x810px.jpg',
   },
 ];
 
@@ -87,7 +120,14 @@ export const Landing: React.FC = () => {
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-b from-chase-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
+        <div className="absolute inset-0 opacity-10" aria-hidden="true">
+          <img 
+            src="/images/banner-img-paragon-cs-1440px.jpg" 
+            alt="" 
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
           <div className="text-center max-w-3xl mx-auto">
             <Link to={ROUTES.LOGIN} className="inline-flex items-center gap-2 mb-8" aria-label="Chase Bank Home">
               <svg className="w-12 h-12 text-chase-600" viewBox="0 0 32 32" fill="none">
@@ -123,41 +163,66 @@ export const Landing: React.FC = () => {
         </div>
 
         {/* Trust Indicators */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {stats.map((stat, index) => (
-              <div key={index} className="py-6">
+              <div key={index} className="py-6 relative">
                 <div className="text-3xl sm:text-4xl font-bold text-chase-900 mb-1">{stat.value}</div>
                 <div className="text-sm text-gray-600">{stat.label}</div>
+                {index < 3 && (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-px h-12 bg-gradient-to-b from-transparent via-chase-200 to-transparent" aria-hidden="true" />
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Solutions Section - Commercial Banking Focus */}
       <section className="py-20 sm:py-28 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-chase-50 text-chase-700 text-sm font-medium mb-4">
+              Commercial Banking Solutions
+            </span>
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Everything you need in one place
+              Expertise that scales with your business
             </h2>
             <p className="text-lg text-gray-600">
-              Comprehensive banking solutions designed around your life
+              Tailored financial solutions for middle-market companies, large corporations, and institutions
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
+          <div className="space-y-16">
+            {solutions.map((solution, index) => (
               <article
                 key={index}
-                className="card-hover p-8 h-full transition-all duration-300"
+                className={`flex flex-col lg:flex-row gap-12 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}
               >
-                <div className="w-14 h-14 rounded-xl bg-chase-50 flex items-center justify-center mb-6 text-chase-600">
-                  <feature.icon className="w-7 h-7" aria-hidden="true" />
+                <div className="relative w-full lg:w-1/2">
+                  <div className="aspect-video bg-chase-50 rounded-2xl overflow-hidden">
+                    <img
+                      src={solution.image}
+                      alt={solution.title}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                <div className="w-full lg:w-1/2 text-center lg:text-left">
+                  <div className="w-14 h-14 rounded-xl bg-chase-50 flex items-center justify-center mb-6 text-chase-600 mx-auto lg:mx-0">
+                    <solution.icon className="w-7 h-7" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">{solution.title}</h3>
+                  <p className="text-gray-600 mb-6 leading-relaxed text-lg">{solution.description}</p>
+<Link
+                      to="#"
+                      className="inline-flex items-center gap-2 font-medium text-chase-600 hover:text-chase-700 transition-colors"
+                    >
+                    Learn more
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
               </article>
             ))}
           </div>
@@ -180,29 +245,78 @@ export const Landing: React.FC = () => {
             {products.map((product, index) => (
               <article
                 key={index}
-                className="card-hover p-8 h-full bg-white transition-all duration-300"
+                className="card-hover bg-white overflow-hidden transition-all duration-300"
               >
-                <div className="w-14 h-14 rounded-xl bg-chase-50 flex items-center justify-center mb-6 text-chase-600">
-                  <product.icon className="w-7 h-7" aria-hidden="true" />
+                <div className="aspect-video relative overflow-hidden">
+                  <img
+                    src={product.image}
+                    alt={product.title}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-chase-900/80 via-transparent to-transparent" aria-hidden="true" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">{product.title}</h3>
-                <p className="text-gray-600 mb-6 leading-relaxed">{product.description}</p>
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-2 font-medium text-chase-600 hover:text-chase-700 transition-colors"
-                >
-                  {product.cta}
-                  <ArrowRight className="w-4 h-4" />
-                </a>
+                <div className="p-6">
+                  <div className="w-12 h-12 rounded-xl bg-chase-50 flex items-center justify-center mb-4 text-chase-600">
+                    <product.icon className="w-6 h-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.title}</h3>
+                  <p className="text-gray-600 mb-4 leading-relaxed">{product.description}</p>
+                  <a
+                    href="#"
+                    className="inline-flex items-center gap-2 font-medium text-chase-600 hover:text-chase-700 transition-colors"
+                  >
+                    {product.cta}
+                    <ArrowRight className="w-4 h-4" />
+                  </a>
+                </div>
               </article>
             ))}
           </div>
         </div>
       </section>
 
+      {/* Why Chase Section */}
+      <section className="py-20 sm:py-28 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Why choose Chase?
+            </h2>
+            <p className="text-lg text-gray-600">
+              A legacy of stability, innovation, and client-first service
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { icon: Shield, title: 'Unmatched Security', desc: 'Multi-layered protection with 24/7 monitoring and zero-liability guarantee' },
+              { icon: Building2, title: 'Financial Strength', desc: 'Backed by $4T+ in assets and 200+ years of banking heritage' },
+              { icon: Smartphone, title: 'Digital Innovation', desc: 'Industry-leading mobile and online platforms with AI-powered insights' },
+              { icon: Users, title: 'Dedicated Support', desc: 'Personal bankers and relationship managers for every client segment' },
+            ].map((item, index) => (
+              <div key={index} className="card-hover p-8 h-full text-center">
+                <div className="w-16 h-16 rounded-2xl bg-chase-50 flex items-center justify-center mx-auto mb-6 text-chase-600">
+                  <item.icon className="w-8 h-8" aria-hidden="true" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">{item.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
-      <section className="py-20 sm:py-28 bg-chase-900">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-20 sm:py-28 bg-chase-900 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-5" aria-hidden="true">
+          <img 
+            src="/images/gecko-thumbnail_1440x810px.jpg" 
+            alt="" 
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
             Ready to get started?
           </h2>

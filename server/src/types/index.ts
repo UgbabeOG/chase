@@ -1,3 +1,5 @@
+import type { Request as ExpressRequest } from 'express';
+
 export interface User {
   id: number;
   username: string;
@@ -79,7 +81,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
-    details?: Record<string, unknown>;
+    details?: Record<string, unknown> | unknown[];
   };
   meta?: Record<string, unknown>;
 }
@@ -170,6 +172,6 @@ export interface JWTPayload {
   exp?: number;
 }
 
-export interface AuthRequest extends Request {
+export interface AuthRequest extends ExpressRequest {
   user?: JWTPayload;
 }

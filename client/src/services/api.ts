@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'axios';
 import type { ApiResponse, LoginResponse, LoginRequest, User, Account, AdminAccount, Transaction, PaginatedResponse, TransferRequest, TransferResponse, Setup2FAResponse, AdminCreateUserRequest, AdminUpdateUserRequest, AdminUpdateTwoFactorRequest, AdminUpdateBalanceRequest, AdminCreateTransactionRequest, TransactionPolicy } from '../types/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = '/api';
 
 export function camelCaseKeys<T>(value: T): T {
   if (Array.isArray(value)) {

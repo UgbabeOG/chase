@@ -1,51 +1,16 @@
-import initSqlJs, { Database, Statement } from 'sql.js';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { createClient, type Client, type InArgs, type InValue, type ResultSet, type Row, type Transaction } from '@libsql/client';
+import { existsSync, mkdirSync } from 'fs';
+import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
 const dbPath = resolve(__dirname, '../../data/chase.db');
 const dataDir = resolve(__dirname, '../../data');
-const wasmPath = resolve(__dirname, '../../sql-wasm.wasm');
+let initialization: Promise<Client> | null = null;
 
-let db: Database | null = null;
-let dbReady: Promise<Database> = initializeDatabase();
-
-// Initialize database asynchronously
-async function initializeDatabase(): Promise<Database> {
-  if (db) return db;
-
-  console.log('Initializing database...');
-  console.log('WASM path:', wasmPath);
-
-  // Ensure data directory exists
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true });
-  }
-
-  // Load SQL.js
-  const SQL = await initSqlJs({
-    locateFile: () => wasmPath
-  });
-
-  // Try to load existing database
-  if (existsSync(dbPath)) {
-    console.log('Loading existing database...');
-    const fileBuffer = readFileSync(dbPath);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    console.log('Creating new database...');
-    db = new SQL.Database();
-  }
-
-  // Enable foreign keys
-  db.exec('PRAGMA foreign_keys = ON;');
-
-  // Create tables
-  db.exec(`
+const schema = `
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username VARCHAR(50) UNIQUE NOT NULL,
@@ -117,43 +82,62 @@ async function initializeDatabase(): Promise<Database> {
     CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
-  `);
+  `;
 
-  const userColumns = db.exec('PRAGMA table_info(users)');
-  const hasTransactionBlockColumn = userColumns[0]?.values.some((column) => column[1] === 'transactions_blocked');
-  if (!hasTransactionBlockColumn) {
-    db.exec('ALTER TABLE users ADD COLUMN transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE');
+export async function initializeDatabase(): Promise<Client> {
+  if (!initialization) {
+    initialization = initializeClient().catch((error: unknown) => {
+      initialization = null;
+      throw error;
+    });
   }
-
-  db.exec(`
-    INSERT OR IGNORE INTO app_settings (setting_key, setting_value)
-    VALUES ('transaction_block_message', 'Transactions are currently disabled for your account. Please contact support.')
-  `);
-
-  console.log('Database schema created successfully.');
-
-  // Save database to file
-  saveDatabase();
-
-  return db;
+  return initialization;
 }
 
-// Start database initialization immediately
-dbReady = initializeDatabase();
+async function initializeClient(): Promise<Client> {
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-function saveDatabase(): void {
-  if (!db) return;
-  const data = db.export();
-  writeFileSync(dbPath, Buffer.from(data));
-  console.log('Database saved to:', dbPath);
+  if (process.env.VERCEL && !url) {
+    throw new Error('TURSO_DATABASE_URL must be configured for Vercel deployments.');
+  }
+  if (url?.startsWith('libsql://') && !authToken) {
+    throw new Error('TURSO_AUTH_TOKEN must be configured for a remote Turso database.');
+  }
+
+  if (!url && !existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
+  const client = createClient({
+    url: url || `file:${dbPath}`,
+    ...(authToken ? { authToken } : {}),
+    intMode: 'number',
+  });
+
+  try {
+    await client.executeMultiple(schema);
+    const userColumns = await client.execute('PRAGMA table_info(users)');
+    if (!userColumns.rows.some((column) => column.name === 'transactions_blocked')) {
+      await client.execute('ALTER TABLE users ADD COLUMN transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE');
+    }
+
+    await client.execute(`
+      INSERT OR IGNORE INTO app_settings (setting_key, setting_value)
+      VALUES ('transaction_block_message', 'Transactions are currently disabled for your account. Please contact support.')
+    `);
+    return client;
+  } catch (error) {
+    client.close();
+    throw error;
+  }
 }
 
 async function seedDatabase(): Promise<void> {
-  await dbReady;
   console.log('Seeding database...');
 
-  const userCount = db!.exec('SELECT COUNT(*) as count FROM users');
-  if (userCount[0]?.values[0][0] > 0) {
+  const userCount = await (await database.prepare('SELECT COUNT(*) as count FROM users')).get() as { count: number };
+  if (userCount.count > 0) {
     console.log('Database already seeded, skipping...');
     return;
   }
@@ -161,23 +145,23 @@ async function seedDatabase(): Promise<void> {
   const passwordHash = bcrypt.hashSync('password123', 12);
   const adminPasswordHash = bcrypt.hashSync('admin123', 12);
 
-  const insertUser = createStatement(`
+  const insertUser = `
     INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, otp_enabled)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  `;
 
-  const insertAccount = createStatement(`
+  const insertAccount = `
     INSERT INTO accounts (user_id, account_type, account_number, routing_number, balance, available_balance, nickname)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+  `;
 
-  const insertTransaction = createStatement(`
+  const insertTransaction = `
     INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  `;
 
   // Create admin user
-  const adminResult = await wrapStatement(insertUser).run([
+  const adminResult = await (await database.prepare(insertUser)).run(
     'admin',
     'admin@chase.com',
     adminPasswordHash,
@@ -186,11 +170,11 @@ async function seedDatabase(): Promise<void> {
     'User',
     '555-0100',
     0
-  ]);
+  );
   const adminId = adminResult.lastInsertRowid;
 
   // Create demo user
-  const userResult = await wrapStatement(insertUser).run([
+  const userResult = await (await database.prepare(insertUser)).run(
     'johndoe',
     'john.doe@email.com',
     passwordHash,
@@ -199,21 +183,21 @@ async function seedDatabase(): Promise<void> {
     'Doe',
     '555-0199',
     0
-  ]);
+  );
   const userId = userResult.lastInsertRowid;
 
   // Create accounts for admin
-  const adminCheckingResult = await wrapStatement(insertAccount).run([adminId, 'checking', '0000000001', '021000021', 50000.00, 50000.00, 'Admin Checking']);
+  const adminCheckingResult = await (await database.prepare(insertAccount)).run(adminId, 'checking', '0000000001', '021000021', 50000.00, 50000.00, 'Admin Checking');
   const adminCheckingId = adminCheckingResult.lastInsertRowid;
 
-  const adminSavingsResult = await wrapStatement(insertAccount).run([adminId, 'savings', '0000000002', '021000021', 100000.00, 100000.00, 'Admin Savings']);
+  const adminSavingsResult = await (await database.prepare(insertAccount)).run(adminId, 'savings', '0000000002', '021000021', 100000.00, 100000.00, 'Admin Savings');
   const adminSavingsId = adminSavingsResult.lastInsertRowid;
 
   // Create accounts for demo user
-  const checkingResult = await wrapStatement(insertAccount).run([userId, 'checking', '1234567890', '021000021', 5432.18, 5432.18, 'Primary Checking']);
+  const checkingResult = await (await database.prepare(insertAccount)).run(userId, 'checking', '1234567890', '021000021', 5432.18, 5432.18, 'Primary Checking');
   const checkingId = checkingResult.lastInsertRowid;
 
-  const savingsResult = await wrapStatement(insertAccount).run([userId, 'savings', '0987654321', '021000021', 12345.67, 12345.67, 'Emergency Savings']);
+  const savingsResult = await (await database.prepare(insertAccount)).run(userId, 'savings', '0987654321', '021000021', 12345.67, 12345.67, 'Emergency Savings');
   const savingsId = savingsResult.lastInsertRowid;
 
   // Generate reference number
@@ -239,7 +223,7 @@ async function seedDatabase(): Promise<void> {
   ];
 
   for (const tx of transactions) {
-    await wrapStatement(insertTransaction).run([
+    await (await database.prepare(insertTransaction)).run(
       tx.accountId,
       tx.type,
       tx.category,
@@ -250,7 +234,7 @@ async function seedDatabase(): Promise<void> {
       tx.ref,
       tx.counterpartyId || null,
       '{}'
-    ]);
+    );
   }
 
   // Seed transactions for demo user savings account
@@ -260,7 +244,7 @@ async function seedDatabase(): Promise<void> {
   ];
 
   for (const tx of savingsTransactions) {
-    await wrapStatement(insertTransaction).run([
+    await (await database.prepare(insertTransaction)).run(
       tx.accountId,
       tx.type,
       tx.category,
@@ -271,106 +255,112 @@ async function seedDatabase(): Promise<void> {
       tx.ref,
       tx.counterpartyId || null,
       '{}'
-    ]);
+    );
   }
-
-  // Save database after seeding
-  saveDatabase();
 
   console.log('Demo data seeded successfully.');
   console.log('Admin user: admin / admin123');
   console.log('Demo user: johndoe / password123');
 }
 
-function createStatement(sql: string): Statement {
-  if (!db) throw new Error('Database not initialized');
-  return db.prepare(sql);
+interface DatabaseStatement {
+  get: (...params: unknown[]) => Promise<unknown>;
+  all: (...params: unknown[]) => Promise<unknown[]>;
+  run: (...params: unknown[]) => Promise<{ lastInsertRowid: number; changes: number }>;
 }
 
-function wrapStatement(stmt: Statement) {
-  const originalGet = stmt.get.bind(stmt);
-  const originalRun = stmt.run.bind(stmt);
+interface DatabaseSession {
+  prepare: (sql: string) => Promise<DatabaseStatement>;
+}
 
+type SqlExecutor = (statement: { sql: string; args: InArgs }) => Promise<ResultSet>;
+
+function toArgs(params: unknown[]): InArgs {
+  const values = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+  return values.map((value) => {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'bigint' ||
+      typeof value === 'boolean' ||
+      value instanceof Date ||
+      value instanceof Uint8Array
+    ) {
+      return value;
+    }
+    throw new TypeError(`Unsupported database parameter type: ${typeof value}`);
+  }) as InValue[];
+}
+
+function rowToObject(columns: string[], row: Row): Record<string, unknown> {
+  return Object.fromEntries(columns.map((column, index) => [column, row[index]]));
+}
+
+function statementFor(execute: SqlExecutor, sql: string): DatabaseStatement {
+  const executeWithParams = (params: unknown[]) => execute({ sql, args: toArgs(params) });
   return {
-    get: async (...params: any[]) => {
-      await dbReady;
-      // Handle both .get([a, b, c]) and .get(a, b, c) calling conventions
-      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-      const result = originalGet(flatParams);
-      if (!result || result.length === 0) return undefined;
-      const columns = stmt.getColumnNames();
-      const obj: Record<string, any> = {};
-      columns.forEach((col, i) => {
-        obj[col] = result[i];
-      });
-      return obj;
+    get: async (...params) => {
+      const result = await executeWithParams(params);
+      return result.rows[0] ? rowToObject(result.columns, result.rows[0]) : undefined;
     },
-    all: async (...params: any[]) => {
-      await dbReady;
-      // Handle both .all([a, b, c]) and .all(a, b, c) calling conventions
-      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-      const results: any[] = [];
-      // Bind parameters first
-      if (flatParams.length > 0) {
-        stmt.bind(flatParams);
-      }
-      while (stmt.step()) {
-        const row = stmt.get();
-        const columns = stmt.getColumnNames();
-        const obj: Record<string, any> = {};
-        columns.forEach((col, i) => {
-          obj[col] = row[i];
-        });
-        results.push(obj);
-      }
-      stmt.reset();
-      return results;
+    all: async (...params) => {
+      const result = await executeWithParams(params);
+      return result.rows.map((row) => rowToObject(result.columns, row));
     },
-    run: async (...params: any[]) => {
-      await dbReady;
-      // Handle both .run([a, b, c]) and .run(a, b, c) calling conventions
-      const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
-      const result = originalRun(flatParams);
-      const lastIdResult = db!.exec('SELECT last_insert_rowid() as id');
+    run: async (...params) => {
+      const result = await executeWithParams(params);
       return {
-        lastInsertRowid: lastIdResult[0]?.values[0]?.[0] || 0,
-        changes: result ? 1 : 0
+        lastInsertRowid: Number(result.lastInsertRowid ?? 0),
+        changes: result.rowsAffected,
       };
     },
   };
 }
 
-async function transaction<T>(fn: () => Promise<T>): Promise<T> {
-  await dbReady;
-  if (!db) throw new Error('Database not initialized');
-  db.exec('BEGIN TRANSACTION');
-  try {
-    const result = await fn();
-    db.exec('COMMIT');
-    return result;
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+async function prepareOn(execute: SqlExecutor, sql: string): Promise<DatabaseStatement> {
+  return statementFor(execute, sql);
 }
 
-// Export the database interface with async methods
-export const database = {
-  prepare: async (sql: string) => {
-    await dbReady;
-    const stmt = createStatement(sql);
-    return wrapStatement(stmt);
+const databaseSession = (execute: SqlExecutor): DatabaseSession => ({
+  prepare: async (sql) => prepareOn(execute, sql),
+});
+
+export const database: DatabaseSession & {
+  transaction: <T>(fn: (transaction: DatabaseSession) => Promise<T>) => Promise<T>;
+  exec: (sql: string) => Promise<void>;
+  close: () => Promise<void>;
+} = {
+  prepare: async (sql) => {
+    const client = await initializeDatabase();
+    return prepareOn((statement) => client.execute(statement), sql);
   },
-  exec: async (sql: string) => {
-    await dbReady;
-    return db!.exec(sql);
+  transaction: async <T>(fn: (transaction: DatabaseSession) => Promise<T>): Promise<T> => {
+    const client = await initializeDatabase();
+    const transaction: Transaction = await client.transaction('write');
+    try {
+      const result = await fn(databaseSession((statement) => transaction.execute(statement)));
+      await transaction.commit();
+      return result;
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    } finally {
+      transaction.close();
+    }
   },
-  transaction,
+  exec: async (sql) => {
+    const client = await initializeDatabase();
+    await client.executeMultiple(sql);
+  },
   close: async () => {
-    await dbReady;
-    db?.close();
-  }
+    if (initialization) {
+      const client = await initialization;
+      client.close();
+      initialization = null;
+    }
+  },
 };
 
-export { initializeDatabase, seedDatabase, saveDatabase, createStatement, wrapStatement, transaction };
+export { seedDatabase };
 export default database;

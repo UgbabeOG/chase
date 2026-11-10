@@ -1,6 +1,6 @@
 import { Response } from 'express';
-import { database, saveDatabase } from '../db/index.js';
-import { AuthRequest, Transaction, TransactionWithAccount, ApiResponse, PaginatedResponse, TransferRequest, TransferResponse } from '../types/index.js';
+import { database } from '../db/index.js';
+import { Account, AuthRequest, Transaction, TransactionWithAccount, ApiResponse, PaginatedResponse, TransferRequest, TransferResponse } from '../types/index.js';
 import { AppError, asyncHandler } from '../middleware/index.js';
 
 function generateReferenceNumber(): string {
@@ -158,14 +158,14 @@ export const transfer = asyncHandler(async (req: AuthRequest, res: Response): Pr
   const newToBalance = toAccount.balance + amount;
   const newToAvailable = toAccount.available_balance + amount;
 
-  await database.transaction(async () => {
-    await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
+  await database.transaction(async (transaction) => {
+    await (await transaction.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
       .run(newFromBalance, newFromAvailable, fromAccount.id);
 
-    await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
+    await (await transaction.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
       .run(newToBalance, newToAvailable, toAccount.id);
 
-    await (await database.prepare(`
+    await (await transaction.prepare(`
       INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)).run(
@@ -181,7 +181,7 @@ export const transfer = asyncHandler(async (req: AuthRequest, res: Response): Pr
       JSON.stringify({ toAccountId: toAccount.id, toAccountNumber: toAccount.account_number })
     );
 
-    await (await database.prepare(`
+    await (await transaction.prepare(`
       INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)).run(
@@ -197,8 +197,6 @@ export const transfer = asyncHandler(async (req: AuthRequest, res: Response): Pr
       JSON.stringify({ fromAccountId: fromAccount.id, fromAccountNumber: fromAccount.account_number })
     );
   });
-  saveDatabase();
-
   const outTransaction = await (await database.prepare(`
     SELECT t.*, a.account_type, a.nickname as account_nickname
     FROM transactions t

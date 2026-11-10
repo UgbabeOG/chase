@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Response, Router } from 'express';
 import { z } from 'zod';
 import * as authController from '../controllers/authController.js';
 import * as accountsController from '../controllers/accountsController.js';
 import * as transactionsController from '../controllers/transactionsController.js';
 import * as adminController from '../controllers/adminController.js';
-import { authenticateToken, requireAdmin, validateBody, validateQuery, validateParams, asyncHandler } from '../middleware/index.js';
-import { AuthRequest, Response } from '../types/index.js';
+import { authenticateToken, requireAdmin, validateBody, validateQuery, validateParams } from '../middleware/index.js';
+import { AuthRequest } from '../types/index.js';
 
 const router = Router();
 
@@ -32,23 +32,23 @@ const disable2FASchema = z.object({
 // Auth routes
 const authRouter = Router();
 
-authRouter.post('/login', validateBody(loginSchema), asyncHandler(authController.login));
-authRouter.post('/login/2fa', validateBody(loginSchema), asyncHandler(authController.login2FA));
-authRouter.post('/logout', authenticateToken, asyncHandler(authController.logout));
-authRouter.post('/refresh', validateBody(refreshSchema), asyncHandler(authController.refresh));
-authRouter.get('/me', authenticateToken, asyncHandler(authController.getMe));
-authRouter.post('/setup-2fa', authenticateToken, validateBody(setup2FASchema), asyncHandler(authController.setup2FA));
-authRouter.post('/verify-2fa', authenticateToken, validateBody(verify2FASchema), asyncHandler(authController.verify2FA));
-authRouter.post('/disable-2fa', authenticateToken, validateBody(disable2FASchema), asyncHandler(authController.disable2FA));
+authRouter.post('/login', validateBody(loginSchema), authController.login);
+authRouter.post('/login/2fa', validateBody(loginSchema), authController.login2FA);
+authRouter.post('/logout', authenticateToken, authController.logout);
+authRouter.post('/refresh', validateBody(refreshSchema), authController.refresh);
+authRouter.get('/me', authenticateToken, authController.getMe);
+authRouter.post('/setup-2fa', authenticateToken, validateBody(setup2FASchema), authController.setup2FA);
+authRouter.post('/verify-2fa', authenticateToken, validateBody(verify2FASchema), authController.verify2FA);
+authRouter.post('/disable-2fa', authenticateToken, validateBody(disable2FASchema), authController.disable2FA);
 
 router.use('/auth', authRouter);
 
 const accountsRouter = Router();
 accountsRouter.use(authenticateToken);
 
-accountsRouter.get('/', asyncHandler(accountsController.getAccounts));
-accountsRouter.get('/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(accountsController.getAccount));
-accountsRouter.get('/:id/balance', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(accountsController.getAccountBalance));
+accountsRouter.get('/', accountsController.getAccounts);
+accountsRouter.get('/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), accountsController.getAccount);
+accountsRouter.get('/:id/balance', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), accountsController.getAccountBalance);
 
 router.use('/accounts', accountsRouter);
 
@@ -64,8 +64,8 @@ const transactionQuerySchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
-transactionsRouter.get('/', validateQuery(transactionQuerySchema), asyncHandler(transactionsController.getTransactions));
-transactionsRouter.get('/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(transactionsController.getTransaction));
+transactionsRouter.get('/', validateQuery(transactionQuerySchema), transactionsController.getTransactions);
+transactionsRouter.get('/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), transactionsController.getTransaction);
 
 const transferSchema = z.object({
   fromAccountId: z.number().int().positive(),
@@ -74,7 +74,7 @@ const transferSchema = z.object({
   description: z.string().max(255).optional(),
 });
 
-transactionsRouter.post('/transfer', validateBody(transferSchema), asyncHandler(transactionsController.transfer));
+transactionsRouter.post('/transfer', validateBody(transferSchema), transactionsController.transfer);
 
 router.use('/transactions', transactionsRouter);
 
@@ -92,11 +92,11 @@ const transactionPolicySchema = z.object({
   blockedMessage: z.string().trim().min(1).max(500),
 });
 
-adminRouter.get('/accounts', asyncHandler(adminController.getAllAccounts));
-adminRouter.get('/transaction-policy', asyncHandler(adminController.getTransactionPolicy));
-adminRouter.put('/transaction-policy', validateBody(transactionPolicySchema), asyncHandler(adminController.updateTransactionPolicy));
-adminRouter.get('/users', validateQuery(adminUserQuerySchema), asyncHandler(adminController.getUsers));
-adminRouter.get('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(adminController.getUser));
+adminRouter.get('/accounts', adminController.getAllAccounts);
+adminRouter.get('/transaction-policy', adminController.getTransactionPolicy);
+adminRouter.put('/transaction-policy', validateBody(transactionPolicySchema), adminController.updateTransactionPolicy);
+adminRouter.get('/users', validateQuery(adminUserQuerySchema), adminController.getUsers);
+adminRouter.get('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), adminController.getUser);
 
 const adminCreateUserSchema = z.object({
   username: z.string().min(3).max(50),
@@ -108,7 +108,7 @@ const adminCreateUserSchema = z.object({
   role: z.enum(['user', 'admin']).optional(),
 });
 
-adminRouter.post('/users', validateBody(adminCreateUserSchema), asyncHandler(adminController.createUser));
+adminRouter.post('/users', validateBody(adminCreateUserSchema), adminController.createUser);
 
 const adminUpdateUserSchema = z.object({
   email: z.string().email().optional(),
@@ -120,14 +120,14 @@ const adminUpdateUserSchema = z.object({
   transactionsBlocked: z.boolean().optional(),
 });
 
-adminRouter.put('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateUserSchema), asyncHandler(adminController.updateUser));
+adminRouter.put('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateUserSchema), adminController.updateUser);
 const adminUpdateTwoFactorSchema = z.object({
   enabled: z.boolean(),
   secret: z.string().trim().min(16).max(64).regex(/^[A-Za-z2-7]+$/).transform((secret) => secret.toUpperCase()).optional(),
 });
 
-adminRouter.put('/users/:id/2fa', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateTwoFactorSchema), asyncHandler(adminController.updateUserTwoFactor));
-adminRouter.delete('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(adminController.deleteUser));
+adminRouter.put('/users/:id/2fa', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateTwoFactorSchema), adminController.updateUserTwoFactor);
+adminRouter.delete('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), adminController.deleteUser);
 
 const adminUpdateBalanceSchema = z.object({
   accountId: z.number().int().positive(),
@@ -135,7 +135,7 @@ const adminUpdateBalanceSchema = z.object({
   availableBalance: z.number().optional(),
 });
 
-adminRouter.put('/users/:id/balance', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateBalanceSchema), asyncHandler(adminController.updateUserBalance));
+adminRouter.put('/users/:id/balance', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateBalanceSchema), adminController.updateUserBalance);
 
 const adminTransactionQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -146,7 +146,7 @@ const adminTransactionQuerySchema = z.object({
   status: z.enum(['pending', 'completed', 'failed', 'cancelled']).optional(),
 });
 
-adminRouter.get('/transactions', validateQuery(adminTransactionQuerySchema), asyncHandler(adminController.getAllTransactions));
+adminRouter.get('/transactions', validateQuery(adminTransactionQuerySchema), adminController.getAllTransactions);
 
 const adminCreateTransactionSchema = z.object({
   accountId: z.number().int().positive(),
@@ -159,9 +159,9 @@ const adminCreateTransactionSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-adminRouter.post('/users/:id/transactions', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminCreateTransactionSchema), asyncHandler(adminController.createTransaction));
-adminRouter.put('/transactions/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(z.object({}).passthrough()), asyncHandler(adminController.updateTransaction));
-adminRouter.delete('/transactions/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(adminController.deleteTransaction));
+adminRouter.post('/users/:id/transactions', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminCreateTransactionSchema), adminController.createTransaction);
+adminRouter.put('/transactions/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(z.object({}).passthrough()), adminController.updateTransaction);
+adminRouter.delete('/transactions/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), adminController.deleteTransaction);
 
 router.use('/admin', adminRouter);
 

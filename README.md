@@ -22,7 +22,7 @@ A premium, high-fidelity banking web application that replicates the Chase Bank 
 
 - **JWT Authentication** - Access tokens (15 min) + Refresh tokens (7 days)
 - **Two-Factor Authentication** - TOTP with QR code setup and backup codes
-- **SQLite Database** - Embedded database with WAL mode for performance
+- **Turso/libSQL Database** - SQLite-compatible persistent storage for deployed services, with a local file database for development
 - **Role-Based Access Control** - User and Admin roles
 - **Responsive Design** - Mobile-first approach with Tailwind CSS
 - **TypeScript** - Full type safety across frontend and backend
@@ -44,7 +44,7 @@ A premium, high-fidelity banking web application that replicates the Chase Bank 
 
 - Node.js 20 + TypeScript
 - Express 4 (web framework)
-- Better-SQLite3 (database)
+- Turso/libSQL (`@libsql/client`) database driver
 - bcryptjs (password hashing)
 - jsonwebtoken (JWT)
 - speakeasy (TOTP)
@@ -89,6 +89,20 @@ npm run build
 # Start production server
 npm run start
 ```
+
+### Vercel Deployment
+
+The root `vercel.json` configures two services: the Vite client (`client`) and Express API (`server`). Requests under `/api/*` go to the API; all other paths go to the client. The client uses the same-origin `/api` path, so no service binding is needed.
+
+The API requires a persistent Turso/libSQL database in Vercel. Configure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as server-service environment variables; do not commit database credentials. For local development, the API uses `server/data/chase.db` unless `TURSO_DATABASE_URL` is set.
+
+To copy the existing local SQLite records into a newly-created, empty Turso database, set those variables in your local shell and run:
+
+```bash
+npm run db:migrate:turso --workspace=server
+```
+
+The migration refuses to import if the target already contains users, accounts, transactions, or sessions. It preserves those tables' records and imports existing transaction policy settings. Do not run `npm run db:reset` against a production database.
 
 ## Demo Credentials
 

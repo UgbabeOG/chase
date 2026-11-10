@@ -22,7 +22,9 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "prettier": "^3.2.5"
+    "exiftool-vendored": "^39.2.0",
+    "prettier": "^3.2.5",
+    "vercel": "^65.14.0"
   },
   "engines": {
     "node": ">=20.0.0"

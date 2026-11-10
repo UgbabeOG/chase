@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { database, saveDatabase } from '../db/index.js';
+import { database } from '../db/index.js';
 import { AuthRequest, User, Account, Transaction, ApiResponse, PaginatedResponse, AdminCreateUserRequest, AdminUpdateUserRequest, AdminUpdateBalanceRequest, AdminCreateTransactionRequest } from '../types/index.js';
 import { AppError, asyncHandler } from '../middleware/index.js';
 
@@ -85,8 +85,6 @@ export const updateTransactionPolicy = asyncHandler(async (req: AuthRequest, res
     VALUES (?, ?)
     ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
   `)).run('transaction_block_message', blockedMessage);
-  saveDatabase();
-
   const response: ApiResponse<{ blockedMessage: string }> = {
     success: true,
     data: { blockedMessage },
@@ -140,8 +138,6 @@ export const createUser = asyncHandler(async (req: AuthRequest, res: Response): 
     VALUES (?, 'checking', ?, '021000021', 0, 0, 'Checking'),
            (?, 'savings', ?, '021000021', 0, 0, 'Savings')
   `)).run(userId, checkingNumber, userId, savingsNumber);
-  saveDatabase();
-
   const user = await (await database.prepare(`
     SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
@@ -156,6 +152,9 @@ export const createUser = asyncHandler(async (req: AuthRequest, res: Response): 
 
 export const updateUser = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
+  if (!id) {
+    throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+  }
   const { email, firstName, lastName, phone, role, isActive, transactionsBlocked } = req.body as AdminUpdateUserRequest;
 
   const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(id);
@@ -185,7 +184,6 @@ export const updateUser = asyncHandler(async (req: AuthRequest, res: Response): 
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
     await (await database.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)).run(...params);
-    saveDatabase();
   }
 
   const updatedUser = await (await database.prepare(`
@@ -221,8 +219,6 @@ export const updateUserTwoFactor = asyncHandler(async (req: Request, res: Respon
     SET otp_enabled = ?, otp_secret = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `)).run(enabled ? 1 : 0, nextSecret, id);
-  saveDatabase();
-
   const response: ApiResponse<{ otpEnabled: boolean }> = {
     success: true,
     data: { otpEnabled: enabled },
@@ -246,8 +242,6 @@ export const deleteUser = asyncHandler(async (req: AuthRequest, res: Response): 
   }
 
   await (await database.prepare('DELETE FROM users WHERE id = ?')).run(id);
-  saveDatabase();
-
   const response: ApiResponse<{ message: string }> = {
     success: true,
     data: { message: 'User deleted successfully' },
@@ -268,8 +262,6 @@ export const updateUserBalance = asyncHandler(async (req: AuthRequest, res: Resp
 
   await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
     .run(newBalance, newAvailableBalance, accountId);
-  saveDatabase();
-
   const updatedAccount = await (await database.prepare('SELECT * FROM accounts WHERE id = ?')).get(accountId) as Account;
 
   const response: ApiResponse<Account> = {
@@ -293,13 +285,13 @@ export const createTransaction = asyncHandler(async (req: AuthRequest, res: Resp
   const referenceNumber = generateReferenceNumber();
   const transactionStatus = status || 'completed';
 
-  await database.transaction(async () => {
+  await database.transaction(async (transaction) => {
     if (transactionStatus === 'completed') {
-      await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
+      await (await transaction.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
         .run(newBalance, newAvailableBalance, accountId);
     }
 
-    await (await database.prepare(`
+    await (await transaction.prepare(`
       INSERT INTO transactions (account_id, type, category, description, amount, balance_after, status, reference_number, counterparty_account_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)).run(
@@ -315,8 +307,6 @@ export const createTransaction = asyncHandler(async (req: AuthRequest, res: Resp
       JSON.stringify(metadata || {})
     );
   });
-  saveDatabase();
-
   const newTransaction = await (await database.prepare(`
     SELECT t.*, a.account_type, a.nickname as account_nickname
     FROM transactions t
@@ -393,6 +383,9 @@ export const getAllTransactions = asyncHandler(async (req: AuthRequest, res: Res
 
 export const updateTransaction = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
+  if (!id) {
+    throw new AppError('TRANSACTION_NOT_FOUND', 'Transaction not found', 404);
+  }
   const { type, category, description, amount, status, counterpartyAccountId, metadata } = req.body;
 
   const transaction = await (await database.prepare('SELECT * FROM transactions WHERE id = ?')).get(id) as Transaction | undefined;
@@ -414,7 +407,6 @@ export const updateTransaction = asyncHandler(async (req: AuthRequest, res: Resp
   if (updates.length > 0) {
     params.push(id);
     await (await database.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ?`)).run(...params);
-    saveDatabase();
   }
 
   const updatedTransaction = await (await database.prepare(`
@@ -440,8 +432,6 @@ export const deleteTransaction = asyncHandler(async (req: AuthRequest, res: Resp
   }
 
   await (await database.prepare('DELETE FROM transactions WHERE id = ?')).run(id);
-  saveDatabase();
-
   const response: ApiResponse<{ message: string }> = {
     success: true,
     data: { message: 'Transaction deleted successfully' },
