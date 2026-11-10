@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, MutableRefObject } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { Button } from './Button';
 
@@ -16,6 +16,7 @@ interface DropdownProps {
   onSelect: (value: string, item: DropdownItem) => void;
   alignment?: 'left' | 'right';
   className?: string;
+  disabled?: boolean;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -24,6 +25,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   onSelect,
   alignment = 'right',
   className = '',
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -38,6 +40,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [handleClickOutside]);
+
+  const handleTriggerClick = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
+    }
+  };
 
   const handleItemClick = (item: DropdownItem) => {
     if (!item.disabled) {
@@ -58,7 +66,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
         variant="ghost"
         size="sm"
         rightIcon={<ChevronDown className="w-4 h-4" />}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleTriggerClick}
+        disabled={disabled}
         aria-haspopup="true"
         aria-expanded={isOpen}
       >
@@ -104,26 +113,31 @@ export const Dropdown: React.FC<DropdownProps> = ({
 };
 
 interface SelectProps {
-  value: string;
-  onChange: (value: string) => void;
+  value?: string;
+  defaultValue?: string;
+  onChange?: (event: React.ChangeEvent<any>) => void;
+  onBlur?: (event: React.FocusEvent<any>) => void;
   options: { label: string; value: string }[];
   placeholder?: string;
   className?: string;
   disabled?: boolean;
   error?: boolean;
+  label?: string;
 }
 
-export const Select: React.FC<SelectProps> = ({
-  value,
+export const Select = React.forwardRef<HTMLDivElement, SelectProps>(({
+  value = '',
   onChange,
   options,
   placeholder,
   className = '',
   disabled,
   error,
-}) => {
+  label,
+  onBlur,
+}, ref) => {
   const [isOpen, setIsOpen] = useState(false);
-  const selectRef = useRef<HTMLDivElement>(null);
+  const selectRef = useRef<HTMLDivElement>(null) as MutableRefObject<HTMLDivElement | null>;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -135,8 +149,71 @@ export const Select: React.FC<SelectProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleChange = (newValue: string) => {
+    if (onChange) {
+      // Create a synthetic event for react-hook-form compatibility
+      const syntheticEvent = {
+        target: { value: newValue },
+        type: 'change',
+        currentTarget: { value: newValue },
+        nativeEvent: null,
+        bubbles: false,
+        cancelable: false,
+        defaultPrevented: false,
+        eventPhase: 0,
+        isTrusted: false,
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        stopImmediatePropagation: () => {},
+        timeStamp: Date.now(),
+        persist: () => {},
+        isDefaultPrevented: () => false,
+        isPropagationStopped: () => false,
+      } as unknown as React.ChangeEvent<any>;
+      onChange(syntheticEvent);
+    }
+  };
+
+  const handleBlur = () => {
+    if (onBlur) {
+      // Create a synthetic focus event for react-hook-form compatibility
+      const syntheticEvent = {
+        target: { value },
+        type: 'blur',
+        currentTarget: { value },
+        nativeEvent: null,
+        bubbles: false,
+        cancelable: false,
+        defaultPrevented: false,
+        eventPhase: 0,
+        isTrusted: false,
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        stopImmediatePropagation: () => {},
+        timeStamp: Date.now(),
+        persist: () => {},
+        isDefaultPrevented: () => false,
+        isPropagationStopped: () => false,
+        relatedTarget: null,
+      } as unknown as React.FocusEvent<any>;
+      onBlur(syntheticEvent);
+    }
+  };
+
+  const setRef = (el: HTMLDivElement | null) => {
+    selectRef.current = el;
+    if (typeof ref === 'function') {
+      ref(el);
+    } else if (ref && typeof ref === 'object' && 'current' in ref) {
+      (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    }
+  };
+
   return (
-    <div ref={selectRef} className={`relative ${className}`}>
+    <div ref={setRef} className={`relative ${className}`} onBlur={handleBlur}>
+      {label && (
+        <label className="label">{label}</label>
+      )}
       <button
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -174,7 +251,7 @@ export const Select: React.FC<SelectProps> = ({
               <li key={option.value}>
                 <button
                   onClick={() => {
-                    onChange(option.value);
+                    handleChange(option.value);
                     setIsOpen(false);
                   }}
                   className={`
@@ -195,4 +272,6 @@ export const Select: React.FC<SelectProps> = ({
       )}
     </div>
   );
-};
+});
+
+Select.displayName = 'Select';

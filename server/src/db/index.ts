@@ -57,6 +57,7 @@ async function initializeDatabase(): Promise<Database> {
       first_name VARCHAR(50) NOT NULL,
       last_name VARCHAR(50) NOT NULL,
       phone VARCHAR(20),
+      transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_login DATETIME,
@@ -106,11 +107,27 @@ async function initializeDatabase(): Promise<Database> {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key VARCHAR(100) PRIMARY KEY,
+      setting_value TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+  `);
+
+  const userColumns = db.exec('PRAGMA table_info(users)');
+  const hasTransactionBlockColumn = userColumns[0]?.values.some((column) => column[1] === 'transactions_blocked');
+  if (!hasTransactionBlockColumn) {
+    db.exec('ALTER TABLE users ADD COLUMN transactions_blocked BOOLEAN NOT NULL DEFAULT FALSE');
+  }
+
+  db.exec(`
+    INSERT OR IGNORE INTO app_settings (setting_key, setting_value)
+    VALUES ('transaction_block_message', 'Transactions are currently disabled for your account. Please contact support.')
   `);
 
   console.log('Database schema created successfully.');

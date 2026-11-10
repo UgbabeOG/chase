@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
@@ -12,7 +12,7 @@ const twoFactorSchema = zod.object({
     otp: zod.string().length(6, 'Code must be 6 digits'),
 });
 export const TwoFactor = () => {
-    const { login, isAuthenticated } = useAuth();
+    const { login, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isLoading, setIsLoading] = useState(false);
@@ -22,8 +22,7 @@ export const TwoFactor = () => {
     const username = state?.username;
     const password = state?.password;
     if (isAuthenticated) {
-        navigate(ROUTES.DASHBOARD);
-        return null;
+        return _jsx(Navigate, { to: user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD, replace: true });
     }
     if (!username || !password) {
         navigate(ROUTES.LOGIN);
@@ -37,7 +36,7 @@ export const TwoFactor = () => {
         setError(null);
         try {
             await login(username, password, data.otp);
-            navigate(ROUTES.DASHBOARD);
+            navigate(user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD);
         }
         catch (err) {
             const message = err instanceof Error ? err.message : 'Invalid code. Please try again.';

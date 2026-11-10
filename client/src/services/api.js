@@ -1,5 +1,17 @@
 import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+export function camelCaseKeys(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => camelCaseKeys(item));
+    }
+    if (value !== null && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [
+            key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()),
+            camelCaseKeys(nestedValue),
+        ]));
+    }
+    return value;
+}
 class ApiService {
     client;
     refreshTokenPromise = null;
@@ -18,7 +30,12 @@ class ApiService {
             }
             return config;
         }, (error) => Promise.reject(error));
-        this.client.interceptors.response.use((response) => response, async (error) => {
+        this.client.interceptors.response.use((response) => {
+            if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+                response.data.data = camelCaseKeys(response.data.data);
+            }
+            return response;
+        }, async (error) => {
             const originalRequest = error.config;
             if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
                 originalRequest._retry = true;
@@ -75,7 +92,7 @@ class ApiService {
         const { accessToken, refreshToken, user } = response.data.data;
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
-        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('user', JSON.stringify(camelCaseKeys(user)));
         return response.data.data;
     }
     async login2FA(credentials) {
@@ -83,7 +100,7 @@ class ApiService {
         const { accessToken, refreshToken, user } = response.data.data;
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
-        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('user', JSON.stringify(camelCaseKeys(user)));
         return response.data.data;
     }
     async logout() {
@@ -97,7 +114,7 @@ class ApiService {
     async getMe() {
         const response = await this.client.get('/auth/me');
         const user = response.data.data;
-        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('user', JSON.stringify(camelCaseKeys(user)));
         return user;
     }
     async setup2FA() {
@@ -140,6 +157,18 @@ class ApiService {
         const response = await this.client.get('/admin/users', { params });
         return response.data.data;
     }
+    async getAdminAccounts() {
+        const response = await this.client.get('/admin/accounts');
+        return response.data.data;
+    }
+    async getTransactionPolicy() {
+        const response = await this.client.get('/admin/transaction-policy');
+        return response.data.data;
+    }
+    async updateTransactionPolicy(policy) {
+        const response = await this.client.put('/admin/transaction-policy', policy);
+        return response.data.data;
+    }
     async getUser(id) {
         const response = await this.client.get(`/admin/users/${id}`);
         return response.data.data;
@@ -150,6 +179,10 @@ class ApiService {
     }
     async updateUser(id, data) {
         const response = await this.client.put(`/admin/users/${id}`, data);
+        return response.data.data;
+    }
+    async updateUserTwoFactor(id, data) {
+        const response = await this.client.put(`/admin/users/${id}/2fa`, data);
         return response.data.data;
     }
     async deleteUser(id) {

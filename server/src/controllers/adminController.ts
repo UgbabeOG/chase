@@ -1,6 +1,6 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { database } from '../db/index.js';
+import { database, saveDatabase } from '../db/index.js';
 import { AuthRequest, User, Account, Transaction, ApiResponse, PaginatedResponse, AdminCreateUserRequest, AdminUpdateUserRequest, AdminUpdateBalanceRequest, AdminCreateTransactionRequest } from '../types/index.js';
 import { AppError, asyncHandler } from '../middleware/index.js';
 
@@ -33,7 +33,7 @@ export const getUsers = asyncHandler(async (req: AuthRequest, res: Response): Pr
   const total = (await countStmt.get(...params) as { total: number }).total;
 
   const usersStmt = await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users
     ${whereClause}
     ORDER BY created_at DESC
@@ -51,11 +51,54 @@ export const getUsers = asyncHandler(async (req: AuthRequest, res: Response): Pr
   res.json(response);
 });
 
+export const getAllAccounts = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const accounts = await (await database.prepare(`
+    SELECT a.*, u.username
+    FROM accounts a
+    JOIN users u ON u.id = a.user_id
+    WHERE a.is_active = 1
+    ORDER BY u.username, a.account_type
+  `)).all();
+
+  const response: ApiResponse<typeof accounts> = { success: true, data: accounts };
+  res.json(response);
+});
+
+export const getTransactionPolicy = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const setting = await (await database.prepare(
+    'SELECT setting_value FROM app_settings WHERE setting_key = ?'
+  )).get('transaction_block_message') as { setting_value: string } | undefined;
+
+  const response: ApiResponse<{ blockedMessage: string }> = {
+    success: true,
+    data: {
+      blockedMessage: setting?.setting_value ?? 'Transactions are currently disabled for your account. Please contact support.',
+    },
+  };
+  res.json(response);
+});
+
+export const updateTransactionPolicy = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const { blockedMessage } = req.body as { blockedMessage: string };
+  await (await database.prepare(`
+    INSERT INTO app_settings (setting_key, setting_value)
+    VALUES (?, ?)
+    ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+  `)).run('transaction_block_message', blockedMessage);
+  saveDatabase();
+
+  const response: ApiResponse<{ blockedMessage: string }> = {
+    success: true,
+    data: { blockedMessage },
+  };
+  res.json(response);
+});
+
 export const getUser = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   const user = await (await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
   `)).get(id) as User | undefined;
 
@@ -97,9 +140,10 @@ export const createUser = asyncHandler(async (req: AuthRequest, res: Response): 
     VALUES (?, 'checking', ?, '021000021', 0, 0, 'Checking'),
            (?, 'savings', ?, '021000021', 0, 0, 'Savings')
   `)).run(userId, checkingNumber, userId, savingsNumber);
+  saveDatabase();
 
   const user = await (await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
   `)).get(userId) as User;
 
@@ -112,7 +156,7 @@ export const createUser = asyncHandler(async (req: AuthRequest, res: Response): 
 
 export const updateUser = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { email, firstName, lastName, phone, role, isActive } = req.body as AdminUpdateUserRequest;
+  const { email, firstName, lastName, phone, role, isActive, transactionsBlocked } = req.body as AdminUpdateUserRequest;
 
   const user = await (await database.prepare('SELECT * FROM users WHERE id = ?')).get(id);
   if (!user) {
@@ -135,21 +179,53 @@ export const updateUser = asyncHandler(async (req: AuthRequest, res: Response): 
   if (phone !== undefined) { updates.push('phone = ?'); params.push(phone); }
   if (role !== undefined) { updates.push('role = ?'); params.push(role); }
   if (isActive !== undefined) { updates.push('is_active = ?'); params.push(isActive ? 1 : 0); }
+  if (transactionsBlocked !== undefined) { updates.push('transactions_blocked = ?'); params.push(transactionsBlocked ? 1 : 0); }
 
   if (updates.length > 0) {
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
     await (await database.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`)).run(...params);
+    saveDatabase();
   }
 
   const updatedUser = await (await database.prepare(`
-    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login
+    SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login
     FROM users WHERE id = ?
   `)).get(id) as User;
 
   const response: ApiResponse<User> = {
     success: true,
     data: updatedUser,
+  };
+  res.json(response);
+});
+
+export const updateUserTwoFactor = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { enabled, secret } = req.body as { enabled: boolean; secret?: string };
+  const user = await (await database.prepare('SELECT id, otp_secret FROM users WHERE id = ?')).get(id) as
+    | { id: number; otp_secret: string | null }
+    | undefined;
+
+  if (!user) {
+    throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+  }
+
+  const nextSecret = secret ?? (enabled ? user.otp_secret : null);
+  if (enabled && !nextSecret) {
+    throw new AppError('2FA_SECRET_REQUIRED', 'Provide an authenticator secret before enabling two-factor authentication', 400);
+  }
+
+  await (await database.prepare(`
+    UPDATE users
+    SET otp_enabled = ?, otp_secret = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `)).run(enabled ? 1 : 0, nextSecret, id);
+  saveDatabase();
+
+  const response: ApiResponse<{ otpEnabled: boolean }> = {
+    success: true,
+    data: { otpEnabled: enabled },
   };
   res.json(response);
 });
@@ -170,6 +246,7 @@ export const deleteUser = asyncHandler(async (req: AuthRequest, res: Response): 
   }
 
   await (await database.prepare('DELETE FROM users WHERE id = ?')).run(id);
+  saveDatabase();
 
   const response: ApiResponse<{ message: string }> = {
     success: true,
@@ -191,6 +268,7 @@ export const updateUserBalance = asyncHandler(async (req: AuthRequest, res: Resp
 
   await (await database.prepare('UPDATE accounts SET balance = ?, available_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'))
     .run(newBalance, newAvailableBalance, accountId);
+  saveDatabase();
 
   const updatedAccount = await (await database.prepare('SELECT * FROM accounts WHERE id = ?')).get(accountId) as Account;
 
@@ -237,6 +315,7 @@ export const createTransaction = asyncHandler(async (req: AuthRequest, res: Resp
       JSON.stringify(metadata || {})
     );
   });
+  saveDatabase();
 
   const newTransaction = await (await database.prepare(`
     SELECT t.*, a.account_type, a.nickname as account_nickname
@@ -335,6 +414,7 @@ export const updateTransaction = asyncHandler(async (req: AuthRequest, res: Resp
   if (updates.length > 0) {
     params.push(id);
     await (await database.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ?`)).run(...params);
+    saveDatabase();
   }
 
   const updatedTransaction = await (await database.prepare(`
@@ -360,6 +440,7 @@ export const deleteTransaction = asyncHandler(async (req: AuthRequest, res: Resp
   }
 
   await (await database.prepare('DELETE FROM transactions WHERE id = ?')).run(id);
+  saveDatabase();
 
   const response: ApiResponse<{ message: string }> = {
     success: true,

@@ -85,18 +85,19 @@ export const TransferForm: React.FC = () => {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
         <div>
-          <label htmlFor="from-account" className="label">From Account</label>
-          <Select
-            id="from-account"
-            value={fromAccountId?.toString() || ''}
-            onChange={(e) => setValue('fromAccountId', parseInt(e.target.value))}
-            options={accounts.map((acc) => ({
-              value: acc.id.toString(),
-              label: `${acc.nickname || acc.accountType} ••••${acc.accountNumber.slice(-4)} (${formatCurrency(acc.availableBalance)} available)`,
-            }))}
-            disabled={isLoading}
-            error={errors.fromAccountId ? true : false}
-          />
+          <label className="label">
+            From Account
+            <Select
+              value={fromAccountId?.toString() || ''}
+              onChange={(e) => setValue('fromAccountId', parseInt(e.target.value, 10))}
+              options={accounts.map((acc) => ({
+                value: acc.id.toString(),
+                label: `${acc.nickname || acc.accountType} ••••${acc.accountNumber.slice(-4)} (${formatCurrency(acc.availableBalance)} available)`,
+              }))}
+              disabled={isLoading}
+              error={errors.fromAccountId ? true : false}
+            />
+          </label>
           {errors.fromAccountId && (
             <p className="mt-1.5 text-sm text-red-600" role="alert">{errors.fromAccountId.message}</p>
           )}

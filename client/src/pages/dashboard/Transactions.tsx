@@ -2,18 +2,19 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, Filter, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAccounts, useTransactions } from '../../hooks';
-import { TransactionTable, TransactionFilters } from '../../components/data-display';
+import { TransactionTable, TransactionFilters as TransactionFiltersComponent, type TransactionFilters } from '../../components/data-display';
 import { Button, Card, Badge, Select, SkeletonCard } from '../../components/ui';
 import { formatRelativeTime } from '../../utils';
 import { TRANSACTION_CATEGORIES } from '../../utils/constants';
+import type { Transaction } from '../../types/api';
 
 export const Transactions: React.FC = () => {
   const { accounts } = useAccounts();
-  const [filters, setFilters] = useState({
-    accountId: undefined as number | undefined,
-    type: undefined as string | undefined,
-    startDate: undefined as string | undefined,
-    endDate: undefined as string | undefined,
+  const [filters, setFilters] = useState<TransactionFilters>({
+    accountId: undefined,
+    type: undefined,
+    startDate: undefined,
+    endDate: undefined,
   });
   const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
@@ -27,7 +28,7 @@ export const Transactions: React.FC = () => {
     limit: 20,
   });
 
-  const handleFiltersChange = (newFilters: typeof filters) => {
+  const handleFiltersChange = (newFilters: TransactionFilters) => {
     setFilters(newFilters);
     setPage(1);
   };
@@ -41,8 +42,38 @@ export const Transactions: React.FC = () => {
 
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[sortConfig.key];
-      const bVal = (b as Record<string, unknown>)[sortConfig.key];
+      const key = sortConfig.key;
+      let aVal: unknown;
+      let bVal: unknown;
+      
+      switch (key) {
+        case 'createdAt':
+          aVal = a.createdAt;
+          bVal = b.createdAt;
+          break;
+        case 'amount':
+          aVal = a.amount;
+          bVal = b.amount;
+          break;
+        case 'description':
+          aVal = a.description;
+          bVal = b.description;
+          break;
+        case 'type':
+          aVal = a.type;
+          bVal = b.type;
+          break;
+        case 'status':
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -68,7 +99,7 @@ export const Transactions: React.FC = () => {
         </div>
       </div>
 
-      <TransactionFilters
+      <TransactionFiltersComponent
         filters={filters}
         onFiltersChange={handleFiltersChange}
         accounts={accounts}
@@ -121,8 +152,8 @@ export const Transactions: React.FC = () => {
         <div className="flex items-center gap-2">
           <Select
             value={`${sortConfig.key}:${sortConfig.direction}`}
-            onChange={(value) => {
-              const [key, direction] = value.split(':');
+            onChange={(e) => {
+              const [key, direction] = e.target.value.split(':');
               setSortConfig({ key, direction: direction as 'asc' | 'desc' });
             }}
             options={[

@@ -226,7 +226,7 @@ export const getMe = asyncHandler(async (req: AuthRequest, res: Response): Promi
     throw new AppError('UNAUTHORIZED', 'Not authenticated', 401);
   }
 
-  const user = await (await database.prepare('SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, created_at, updated_at, last_login FROM users WHERE id = ?')).get(req.user.userId);
+  const user = await (await database.prepare('SELECT id, username, email, role, first_name, last_name, phone, otp_enabled, is_active, transactions_blocked, created_at, updated_at, last_login FROM users WHERE id = ?')).get(req.user.userId);
 
   if (!user) {
     throw new AppError('USER_NOT_FOUND', 'User not found', 404);

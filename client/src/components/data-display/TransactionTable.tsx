@@ -9,6 +9,7 @@ interface TransactionTableProps {
   onPageChange: (page: number) => void;
   isLoading?: boolean;
   onRowClick?: (transaction: Transaction) => void;
+  emptyMessage?: string;
 }
 
 export const TransactionTable: React.FC<TransactionTableProps> = ({
@@ -17,6 +18,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
   onPageChange,
   isLoading,
   onRowClick,
+  emptyMessage,
 }) => {
   const columns = useMemo(
     () => [
@@ -94,7 +96,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
         data={transactions}
         keyExtractor={(row) => row.id.toString()}
         isLoading={isLoading}
-        emptyMessage="No transactions found"
+        emptyMessage={emptyMessage || 'No transactions found'}
         hoverable
         onRowClick={onRowClick}
       />
@@ -109,14 +111,16 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
   );
 };
 
+export type TransactionFilters = {
+  accountId?: number;
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 interface TransactionFiltersProps {
-  filters: {
-    accountId?: number;
-    type?: string;
-    startDate?: string;
-    endDate?: string;
-  };
-  onFiltersChange: (filters: typeof filters) => void;
+  filters: TransactionFilters;
+  onFiltersChange: (filters: TransactionFilters) => void;
   accounts: { id: number; nickname: string | null; accountType: string; accountNumber: string }[];
   isLoading?: boolean;
 }

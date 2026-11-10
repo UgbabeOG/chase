@@ -1,14 +1,15 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { useAdminUsers, useAdminTransactions } from '../../hooks';
 import { api } from '../../services/api';
 import { Table, Pagination, Button, Input, Modal, Badge, Select } from '../../components/ui';
 import { formatCurrency, formatDate, formatRelativeTime } from '../../utils';
 import { useToast } from '../../store/ToastContext';
-import { TRANSACTION_CATEGORIES, TRANSACTION_TYPES, TRANSACTION_STATUSES } from '../../utils/constants';
+import { ROUTES, TRANSACTION_CATEGORIES, TRANSACTION_TYPES, TRANSACTION_STATUSES } from '../../utils/constants';
 import * as zod from 'zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 const createTransactionSchema = zod.object({
     accountId: zod.number().int().positive(),
@@ -21,9 +22,11 @@ const createTransactionSchema = zod.object({
     metadata: zod.record(zod.unknown()).optional(),
 });
 export const AdminTransactions = () => {
-    const { users } = useAdminUsers({ limit: 1000 });
+    const { users } = useAdminUsers({ limit: 100 });
     const { transactions, pagination, isLoading, refetch } = useAdminTransactions();
     const { showToast } = useToast();
+    const [accounts, setAccounts] = useState([]);
+    const [isAccountsLoading, setIsAccountsLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -37,21 +40,42 @@ export const AdminTransactions = () => {
     const [editingTransaction, setEditingTransaction] = useState(null);
     const [deletingTransaction, setDeletingTransaction] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const { register: createRegister, handleSubmit: createHandleSubmit, reset: createReset, watch: createWatch, setValue: createSetValue, formState: { errors: createErrors }, } = useForm({
+    const { register: createRegister, handleSubmit: createHandleSubmit, reset: createReset, watch: createWatch, setValue: createSetValue, control: createControl, formState: { errors: createErrors }, } = useForm({
         resolver: zodResolver(createTransactionSchema),
         defaultValues: { type: 'debit', status: 'completed' },
     });
-    const { register: updateRegister, handleSubmit: updateHandleSubmit, reset: updateReset, formState: { errors: updateErrors }, } = useForm({
+    const { register: updateRegister, handleSubmit: updateHandleSubmit, reset: updateReset, control: updateControl, formState: { errors: updateErrors }, } = useForm({
         resolver: zodResolver(createTransactionSchema.partial()),
     });
     const watchedType = createWatch('type');
     const watchedAccountId = createWatch('accountId');
+    useEffect(() => {
+        let active = true;
+        api.getAdminAccounts()
+            .then((data) => {
+            if (active)
+                setAccounts(data);
+        })
+            .catch((err) => {
+            const message = err instanceof Error ? err.message : 'Failed to load accounts';
+            showToast({ type: 'error', title: 'Error', message });
+        })
+            .finally(() => {
+            if (active)
+                setIsAccountsLoading(false);
+        });
+        return () => {
+            active = false;
+        };
+    }, [showToast]);
     const handleCreate = async (data) => {
         setIsSubmitting(true);
         try {
-            // Find user for the account
-            const userId = users.find((u) => u.id === data.accountId)?.id || 1;
-            await api.createTransaction(userId, data);
+            const account = accounts.find((item) => item.id === data.accountId);
+            if (!account) {
+                throw new Error('Select a valid account for this transaction.');
+            }
+            await api.createTransaction(account.userId, data);
             showToast({ type: 'success', title: 'Transaction Created', message: 'Transaction has been created successfully' });
             createReset();
             setIsCreateOpen(false);
@@ -182,15 +206,23 @@ export const AdminTransactions = () => {
             render: (row) => (_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(Button, { variant: "ghost", size: "sm", onClick: () => setEditingTransaction(row), disabled: isSubmitting, children: _jsx(Edit, { className: "w-4 h-4" }) }), _jsx(Button, { variant: "ghost", size: "sm", onClick: () => setDeletingTransaction(row), disabled: isSubmitting, children: _jsx(Trash2, { className: "w-4 h-4 text-red-600" }) })] })),
         },
     ], [transactions, isSubmitting]);
-    return (_jsxs("div", { className: "space-y-6", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-2xl font-bold text-gray-900", children: "Transaction Management" }), _jsx("p", { className: "text-sm text-gray-600 mt-1", children: "View, create, and manage all transactions" })] }), _jsxs("div", { className: "flex items-center gap-3", children: [_jsx(Button, { variant: "ghost", size: "sm", onClick: () => refetch(), children: "Refresh" }), _jsx(Button, { onClick: () => setIsCreateOpen(true), leftIcon: _jsx(Plus, { className: "w-4 h-4" }), children: "Add Transaction" })] })] }), _jsxs("div", { className: "card", children: [_jsx("div", { className: "p-4 border-b border-gray-200", children: _jsxs("div", { className: "flex flex-col sm:flex-row gap-4", children: [_jsxs("div", { className: "relative flex-1 max-w-md", children: [_jsx(Search, { className: "absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" }), _jsx("input", { type: "text", placeholder: "Search description...", value: search, onChange: (e) => setSearch(e.target.value), className: "input pl-10" })] }), _jsx(Select, { value: typeFilter, onChange: (value) => setTypeFilter(value), options: [
+    return (_jsxs("div", { className: "space-y-6", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-2xl font-bold text-gray-900", children: "Transaction Management" }), _jsx("p", { className: "text-sm text-gray-600 mt-1", children: "View, create, and manage all transactions" })] }), _jsxs("div", { className: "flex flex-col sm:flex-row gap-3", children: [_jsx(Link, { to: ROUTES.ADMIN_USERS, children: _jsx(Button, { variant: "secondary", className: "w-full", children: "User Management" }) }), _jsx(Button, { variant: "ghost", size: "sm", onClick: () => refetch(), children: "Refresh" }), _jsx(Button, { onClick: () => setIsCreateOpen(true), leftIcon: _jsx(Plus, { className: "w-4 h-4" }), children: "Add Transaction" })] })] }), _jsxs("div", { className: "card", children: [_jsx("div", { className: "p-4 border-b border-gray-200", children: _jsxs("div", { className: "flex flex-col sm:flex-row gap-4", children: [_jsxs("div", { className: "relative flex-1 max-w-md", children: [_jsx(Search, { className: "absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" }), _jsx("input", { type: "text", placeholder: "Search description...", value: search, onChange: (e) => setSearch(e.target.value), className: "input pl-10" })] }), _jsx(Select, { value: typeFilter, onChange: (e) => setTypeFilter(e.target.value), options: [
                                         { value: '', label: 'All Types' },
                                         ...TRANSACTION_TYPES,
-                                    ], className: "w-40" }), _jsx(Select, { value: statusFilter, onChange: (value) => setStatusFilter(value), options: [
+                                    ], className: "w-40" }), _jsx(Select, { value: statusFilter, onChange: (e) => setStatusFilter(e.target.value), options: [
                                         { value: '', label: 'All Statuses' },
                                         ...TRANSACTION_STATUSES,
-                                    ], className: "w-40" }), _jsx(Select, { value: userFilter, onChange: (value) => setUserFilter(value), options: [
+                                    ], className: "w-40" }), _jsx(Select, { value: userFilter, onChange: (e) => setUserFilter(e.target.value), options: [
                                         { value: '', label: 'All Users' },
                                         ...users.map((u) => ({ value: u.id.toString(), label: `${u.firstName} ${u.lastName} (${u.username})` })),
-                                    ], className: "w-48" })] }) }), _jsx(Table, { columns: columns, data: transactions, keyExtractor: (row) => row.id.toString(), isLoading: isLoading, emptyMessage: "No transactions found", hoverable: true }), pagination.totalPages > 1 && (_jsx(Pagination, { currentPage: page, totalPages: pagination.totalPages, onPageChange: setPage }))] }), _jsx(Modal, { isOpen: isCreateOpen, onClose: () => setIsCreateOpen(false), title: "Create Transaction", size: "lg", children: _jsxs("form", { onSubmit: createHandleSubmit(handleCreate), className: "space-y-4", noValidate: true, children: [_jsx(Select, { ...createRegister('accountId', { valueAsNumber: true }), label: "Account", options: users.flatMap((u) => u.id // This would need accounts from the user
-                            ).map((acc) => ({ value: acc.id.toString(), label: `${acc.nickname || acc.accountType} ••••${acc.accountNumber.slice(-4)}` })), disabled: isSubmitting }), _jsx(Select, { ...createRegister('type'), label: "Type", options: TRANSACTION_TYPES.map((t) => ({ value: t.value, label: t.label })), disabled: isSubmitting }), _jsx(Select, { ...createRegister('category'), label: "Category (Optional)", options: TRANSACTION_CATEGORIES.map((c) => ({ value: c, label: c })), disabled: isSubmitting }), _jsx(Input, { ...createRegister('description'), label: "Description", placeholder: "Transaction description", disabled: isSubmitting }), _jsx(Input, { ...createRegister('amount', { valueAsNumber: true }), label: "Amount", type: "number", step: "0.01", placeholder: "0.00", disabled: isSubmitting }), _jsx(Select, { ...createRegister('status'), label: "Status", options: TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label })), disabled: isSubmitting }), _jsxs("div", { className: "flex justify-end gap-3 pt-4 border-t border-gray-200", children: [_jsx(Button, { type: "button", variant: "secondary", onClick: () => setIsCreateOpen(false), disabled: isSubmitting, children: "Cancel" }), _jsx(Button, { type: "submit", isLoading: isSubmitting, children: "Create Transaction" })] })] }) }), _jsx(Modal, { isOpen: !!editingTransaction, onClose: () => setEditingTransaction(null), title: "Edit Transaction", size: "lg", children: editingTransaction && (_jsxs("form", { onSubmit: updateHandleSubmit(handleUpdate), className: "space-y-4", noValidate: true, children: [_jsx(Input, { ...updateRegister('description'), label: "Description", defaultValue: editingTransaction.description, disabled: isSubmitting }), _jsx(Input, { ...updateRegister('amount', { valueAsNumber: true }), label: "Amount", type: "number", step: "0.01", defaultValue: editingTransaction.amount, disabled: isSubmitting }), _jsx(Select, { ...updateRegister('status'), label: "Status", options: TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label })), defaultValue: editingTransaction.status, disabled: isSubmitting }), _jsx(Select, { ...updateRegister('category'), label: "Category", options: TRANSACTION_CATEGORIES.map((c) => ({ value: c, label: c })), defaultValue: editingTransaction.category || '', disabled: isSubmitting }), _jsxs("div", { className: "flex justify-end gap-3 pt-4 border-t border-gray-200", children: [_jsx(Button, { type: "button", variant: "secondary", onClick: () => setEditingTransaction(null), disabled: isSubmitting, children: "Cancel" }), _jsx(Button, { type: "submit", isLoading: isSubmitting, children: "Save Changes" })] })] })) }), _jsx(Modal, { isOpen: !!deletingTransaction, onClose: () => setDeletingTransaction(null), title: "Delete Transaction", size: "sm", children: deletingTransaction && (_jsxs("div", { className: "space-y-4", children: [_jsxs("p", { className: "text-gray-600", children: ["Are you sure you want to delete this transaction?", _jsx("br", {}), _jsx("strong", { className: "text-gray-900", children: deletingTransaction.description }), "(", formatCurrency(Math.abs(deletingTransaction.amount)), ")"] }), _jsxs("div", { className: "flex justify-end gap-3", children: [_jsx(Button, { variant: "secondary", onClick: () => setDeletingTransaction(null), disabled: isSubmitting, children: "Cancel" }), _jsx(Button, { variant: "danger", onClick: handleDelete, isLoading: isSubmitting, children: "Delete Transaction" })] })] })) })] }));
+                                    ], className: "w-48" })] }) }), _jsx(Table, { columns: columns, data: transactions, keyExtractor: (row) => row.id.toString(), isLoading: isLoading, emptyMessage: "No transactions found", hoverable: true }), pagination.totalPages > 1 && (_jsx(Pagination, { currentPage: page, totalPages: pagination.totalPages, onPageChange: setPage }))] }), _jsx(Modal, { isOpen: isCreateOpen, onClose: () => setIsCreateOpen(false), title: "Create Transaction", size: "lg", children: _jsxs("form", { onSubmit: createHandleSubmit(handleCreate), className: "space-y-4", noValidate: true, children: [_jsx(Controller, { control: createControl, name: "accountId", render: ({ field }) => (_jsx(Select, { ref: field.ref, label: "Account", value: field.value?.toString() || '', placeholder: "Select an account", onChange: (event) => field.onChange(Number(event.target.value)), onBlur: field.onBlur, options: accounts.map((account) => ({
+                                    value: account.id.toString(),
+                                    label: `${account.nickname || account.accountType} ••••${account.accountNumber.slice(-4)} (${account.username})`,
+                                })), disabled: isSubmitting || isAccountsLoading || accounts.length === 0 })) }), _jsx(Controller, { control: createControl, name: "type", render: ({ field }) => (_jsx(Select, { ref: field.ref, label: "Type", value: field.value, onChange: (event) => field.onChange(event.target.value), onBlur: field.onBlur, options: TRANSACTION_TYPES.map((t) => ({ value: t.value, label: t.label })), disabled: isSubmitting })) }), _jsx(Controller, { control: createControl, name: "category", render: ({ field }) => (_jsx(Select, { ref: field.ref, label: "Category (Optional)", value: field.value || '', placeholder: "No category", onChange: (event) => field.onChange(event.target.value || undefined), onBlur: field.onBlur, options: [
+                                    { value: '', label: 'No category' },
+                                    ...TRANSACTION_CATEGORIES.map((category) => ({ value: category, label: category })),
+                                ], disabled: isSubmitting })) }), _jsx(Input, { ...createRegister('description'), label: "Description", placeholder: "Transaction description", disabled: isSubmitting }), _jsx(Input, { ...createRegister('amount', { valueAsNumber: true }), label: "Amount", type: "number", step: "0.01", placeholder: "0.00", disabled: isSubmitting }), _jsx(Controller, { control: createControl, name: "status", render: ({ field }) => (_jsx(Select, { ref: field.ref, label: "Status", value: field.value || 'completed', onChange: (event) => field.onChange(event.target.value), onBlur: field.onBlur, options: TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label })), disabled: isSubmitting })) }), _jsxs("div", { className: "flex justify-end gap-3 pt-4 border-t border-gray-200", children: [_jsx(Button, { type: "button", variant: "secondary", onClick: () => setIsCreateOpen(false), disabled: isSubmitting, children: "Cancel" }), _jsx(Button, { type: "submit", isLoading: isSubmitting, children: "Create Transaction" })] })] }) }), _jsx(Modal, { isOpen: !!editingTransaction, onClose: () => setEditingTransaction(null), title: "Edit Transaction", size: "lg", children: editingTransaction && (_jsxs("form", { onSubmit: updateHandleSubmit(handleUpdate), className: "space-y-4", noValidate: true, children: [_jsx(Input, { ...updateRegister('description'), label: "Description", defaultValue: editingTransaction.description, disabled: isSubmitting }), _jsx(Input, { ...updateRegister('amount', { valueAsNumber: true }), label: "Amount", type: "number", step: "0.01", defaultValue: editingTransaction.amount, disabled: isSubmitting }), _jsx(Controller, { control: updateControl, name: "status", defaultValue: editingTransaction.status, render: ({ field }) => (_jsx(Select, { ref: field.ref, label: "Status", value: field.value || editingTransaction.status, onChange: (event) => field.onChange(event.target.value), onBlur: field.onBlur, options: TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label })), disabled: isSubmitting })) }), _jsx(Controller, { control: updateControl, name: "category", defaultValue: editingTransaction.category || '', render: ({ field }) => (_jsx(Select, { ref: field.ref, label: "Category", value: field.value || '', placeholder: "No category", onChange: (event) => field.onChange(event.target.value || undefined), onBlur: field.onBlur, options: [
+                                    { value: '', label: 'No category' },
+                                    ...TRANSACTION_CATEGORIES.map((category) => ({ value: category, label: category })),
+                                ], disabled: isSubmitting })) }), _jsxs("div", { className: "flex justify-end gap-3 pt-4 border-t border-gray-200", children: [_jsx(Button, { type: "button", variant: "secondary", onClick: () => setEditingTransaction(null), disabled: isSubmitting, children: "Cancel" }), _jsx(Button, { type: "submit", isLoading: isSubmitting, children: "Save Changes" })] })] })) }), _jsx(Modal, { isOpen: !!deletingTransaction, onClose: () => setDeletingTransaction(null), title: "Delete Transaction", size: "sm", children: deletingTransaction && (_jsxs("div", { className: "space-y-4", children: [_jsxs("p", { className: "text-gray-600", children: ["Are you sure you want to delete this transaction?", _jsx("br", {}), _jsx("strong", { className: "text-gray-900", children: deletingTransaction.description }), "(", formatCurrency(Math.abs(deletingTransaction.amount)), ")"] }), _jsxs("div", { className: "flex justify-end gap-3", children: [_jsx(Button, { variant: "secondary", onClick: () => setDeletingTransaction(null), disabled: isSubmitting, children: "Cancel" }), _jsx(Button, { variant: "danger", onClick: handleDelete, isLoading: isSubmitting, children: "Delete Transaction" })] })] })) })] }));
 };

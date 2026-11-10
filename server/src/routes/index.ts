@@ -88,6 +88,13 @@ const adminUserQuerySchema = z.object({
   role: z.enum(['user', 'admin']).optional(),
 });
 
+const transactionPolicySchema = z.object({
+  blockedMessage: z.string().trim().min(1).max(500),
+});
+
+adminRouter.get('/accounts', asyncHandler(adminController.getAllAccounts));
+adminRouter.get('/transaction-policy', asyncHandler(adminController.getTransactionPolicy));
+adminRouter.put('/transaction-policy', validateBody(transactionPolicySchema), asyncHandler(adminController.updateTransactionPolicy));
 adminRouter.get('/users', validateQuery(adminUserQuerySchema), asyncHandler(adminController.getUsers));
 adminRouter.get('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(adminController.getUser));
 
@@ -110,9 +117,16 @@ const adminUpdateUserSchema = z.object({
   phone: z.string().max(20).optional(),
   role: z.enum(['user', 'admin']).optional(),
   isActive: z.boolean().optional(),
+  transactionsBlocked: z.boolean().optional(),
 });
 
 adminRouter.put('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateUserSchema), asyncHandler(adminController.updateUser));
+const adminUpdateTwoFactorSchema = z.object({
+  enabled: z.boolean(),
+  secret: z.string().trim().min(16).max(64).regex(/^[A-Za-z2-7]+$/).transform((secret) => secret.toUpperCase()).optional(),
+});
+
+adminRouter.put('/users/:id/2fa', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), validateBody(adminUpdateTwoFactorSchema), asyncHandler(adminController.updateUserTwoFactor));
 adminRouter.delete('/users/:id', validateParams(z.object({ id: z.string().uuid().or(z.coerce.number()) })), asyncHandler(adminController.deleteUser));
 
 const adminUpdateBalanceSchema = z.object({

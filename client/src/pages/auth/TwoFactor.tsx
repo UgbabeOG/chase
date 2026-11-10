@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
@@ -15,7 +15,7 @@ const twoFactorSchema = zod.object({
 type TwoFactorFormData = zod.infer<typeof twoFactorSchema>;
 
 export const TwoFactor: React.FC = () => {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +27,7 @@ export const TwoFactor: React.FC = () => {
   const password = state?.password;
 
   if (isAuthenticated) {
-    navigate(ROUTES.DASHBOARD);
-    return null;
+    return <Navigate to={user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD} replace />;
   }
 
   if (!username || !password) {
@@ -49,7 +48,7 @@ export const TwoFactor: React.FC = () => {
     setError(null);
     try {
       await login(username, password, data.otp);
-      navigate(ROUTES.DASHBOARD);
+      navigate(user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid code. Please try again.';
       setError(message);

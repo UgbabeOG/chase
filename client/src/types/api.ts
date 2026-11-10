@@ -6,6 +6,7 @@ export interface User {
   firstName: string;
   lastName: string;
   phone: string | null;
+  transactionsBlocked: boolean;
   otpEnabled: boolean;
   isActive: boolean;
   createdAt: string;
@@ -108,6 +109,20 @@ export interface AdminUpdateUserRequest {
   phone?: string;
   role?: 'user' | 'admin';
   isActive?: boolean;
+  transactionsBlocked?: boolean;
+}
+
+export interface AdminUpdateTwoFactorRequest {
+  enabled: boolean;
+  secret?: string;
+}
+
+export interface TransactionPolicy {
+  blockedMessage: string;
+}
+
+export interface AdminAccount extends Account {
+  username: string;
 }
 
 export interface AdminUpdateBalanceRequest {

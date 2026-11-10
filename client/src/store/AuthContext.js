@@ -1,10 +1,11 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api } from '../services/api';
+import { api, camelCaseKeys } from '../services/api';
 const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const refreshUser = useCallback(async () => {
         if (!api.isAuthenticated()) {
             setUser(null);
@@ -27,7 +28,9 @@ export function AuthProvider({ children }) {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             try {
-                setUser(JSON.parse(storedUser));
+                const parsedUser = JSON.parse(storedUser);
+                // Transform snake_case to camelCase for any existing stored users
+                setUser(camelCaseKeys(parsedUser));
             }
             catch {
                 localStorage.removeItem('user');
@@ -54,11 +57,15 @@ export function AuthProvider({ children }) {
         }
     };
     const logout = async () => {
+        setIsLoggingOut(true);
         try {
             await api.logout();
+            // Simulate backend processing for 2 seconds
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
         finally {
             setUser(null);
+            setIsLoggingOut(false);
         }
     };
     const setup2FA = async () => {
@@ -76,6 +83,7 @@ export function AuthProvider({ children }) {
             user,
             isLoading,
             isAuthenticated: !!user,
+            isLoggingOut,
             login,
             logout,
             refreshUser,
@@ -84,6 +92,7 @@ export function AuthProvider({ children }) {
             disable2FA,
         }, children: children }));
 }
+;
 export function useAuth() {
     const context = useContext(AuthContext);
     if (!context) {

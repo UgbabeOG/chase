@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Layout, AuthLayout, AdminLayout } from './components/layout';
+import { Landing } from './pages/Landing';
 import { Login, TwoFactor, Setup2FA } from './pages/auth';
 import { Dashboard, Accounts, Transactions } from './pages/dashboard';
 import { Transfer } from './pages/transfers';
@@ -10,9 +11,10 @@ import { useAuth } from './store/AuthContext';
 import { ROUTES } from './utils/constants';
 
 const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isLoggingOut, user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
-  if (isLoading) {
+  if (isLoading || isLoggingOut) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-chase-600" />
@@ -20,7 +22,11 @@ const ProtectedRoute: React.FC = () => {
     );
   }
 
-  return isAuthenticated ? <Outlet /> : <Navigate to={ROUTES.LOGIN} replace />;
+  if (!isAuthenticated) {
+    return <Navigate to={ROUTES.LOGIN} replace />;
+  }
+
+  return isAdmin ? <Navigate to={ROUTES.ADMIN_USERS} replace /> : <Outlet />;
 };
 
 const AdminRoute: React.FC = () => {
@@ -42,7 +48,7 @@ const AdminRoute: React.FC = () => {
 };
 
 const PublicRoute: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -52,12 +58,22 @@ const PublicRoute: React.FC = () => {
     );
   }
 
-  return isAuthenticated ? <Navigate to={ROUTES.DASHBOARD} replace /> : <Outlet />;
+  if (isAuthenticated) {
+    return <Navigate to={user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD} replace />;
+  }
+
+  return (
+    <main className="flex min-h-screen min-h-[100svh] w-full items-center justify-center px-4 py-8 sm:px-6">
+      <Outlet />
+    </main>
+  );
 };
 
 const App: React.FC = () => {
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
+
       <Route element={<PublicRoute />}>
         <Route path={ROUTES.LOGIN} element={<Login />} />
         <Route path={ROUTES.TWO_FACTOR} element={<TwoFactor />} />

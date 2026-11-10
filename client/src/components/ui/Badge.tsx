@@ -5,9 +5,10 @@ interface BadgeProps {
   variant?: 'success' | 'warning' | 'error' | 'info' | 'gray';
   size?: 'sm' | 'md';
   className?: string;
+  onRemove?: () => void;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ children, variant = 'gray', size = 'md', className = '' }) => {
+export const Badge: React.FC<BadgeProps> = ({ children, variant = 'gray', size = 'md', className = '', onRemove }) => {
   const variantClasses = {
     success: 'bg-green-50 text-green-700',
     warning: 'bg-yellow-50 text-yellow-700',
@@ -22,8 +23,20 @@ export const Badge: React.FC<BadgeProps> = ({ children, variant = 'gray', size =
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full font-medium ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}>
       {children}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex items-center justify-center w-4 h-4 rounded-full hover:bg-black/10 transition-colors"
+          aria-label="Remove filter"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
     </span>
   );
 };

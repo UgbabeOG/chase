@@ -2,7 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useMemo } from 'react';
 import { Table, Pagination, Badge } from '../ui';
 import { formatCurrency, formatDate, formatRelativeTime, getTransactionTypeLabel } from '../../utils';
-export const TransactionTable = ({ transactions, pagination, onPageChange, isLoading, onRowClick, }) => {
+export const TransactionTable = ({ transactions, pagination, onPageChange, isLoading, onRowClick, emptyMessage, }) => {
     const columns = useMemo(() => [
         {
             key: 'date',
@@ -50,7 +50,7 @@ export const TransactionTable = ({ transactions, pagination, onPageChange, isLoa
             },
         },
     ], []);
-    return (_jsxs("div", { className: "card overflow-hidden", children: [_jsx(Table, { columns: columns, data: transactions, keyExtractor: (row) => row.id.toString(), isLoading: isLoading, emptyMessage: "No transactions found", hoverable: true, onRowClick: onRowClick }), pagination.totalPages > 1 && (_jsx(Pagination, { currentPage: pagination.page, totalPages: pagination.totalPages, onPageChange: onPageChange }))] }));
+    return (_jsxs("div", { className: "card overflow-hidden", children: [_jsx(Table, { columns: columns, data: transactions, keyExtractor: (row) => row.id.toString(), isLoading: isLoading, emptyMessage: emptyMessage || 'No transactions found', hoverable: true, onRowClick: onRowClick }), pagination.totalPages > 1 && (_jsx(Pagination, { currentPage: pagination.page, totalPages: pagination.totalPages, onPageChange: onPageChange }))] }));
 };
 export const TransactionFilters = ({ filters, onFiltersChange, accounts, isLoading, }) => {
     const accountOptions = accounts.map((acc) => ({

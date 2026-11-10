@@ -1,14 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Filter, X, Download, ChevronDown, ChevronUp, Plus, Edit, Trash2, DollarSign, CreditCard } from 'lucide-react';
 import { useAdminUsers, useAdminTransactions } from '../../hooks';
 import { api } from '../../services/api';
 import { Table, Pagination, Button, Input, Modal, Badge, Select, Card, SkeletonCard } from '../../components/ui';
 import { formatCurrency, formatDate, formatRelativeTime } from '../../utils';
 import { useToast } from '../../store/ToastContext';
-import { TRANSACTION_CATEGORIES, TRANSACTION_TYPES, TRANSACTION_STATUSES } from '../../utils/constants';
+import { ROUTES, TRANSACTION_CATEGORIES, TRANSACTION_TYPES, TRANSACTION_STATUSES } from '../../utils/constants';
 import * as zod from 'zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { AdminAccount } from '../../types/api';
 
 const createTransactionSchema = zod.object({
   accountId: zod.number().int().positive(),
@@ -24,9 +26,11 @@ const createTransactionSchema = zod.object({
 type CreateTransactionFormData = zod.infer<typeof createTransactionSchema>;
 
 export const AdminTransactions: React.FC = () => {
-  const { users } = useAdminUsers({ limit: 1000 });
+  const { users } = useAdminUsers({ limit: 100 });
   const { transactions, pagination, isLoading, refetch } = useAdminTransactions();
   const { showToast } = useToast();
+  const [accounts, setAccounts] = useState<AdminAccount[]>([]);
+  const [isAccountsLoading, setIsAccountsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -47,6 +51,7 @@ export const AdminTransactions: React.FC = () => {
     reset: createReset,
     watch: createWatch,
     setValue: createSetValue,
+    control: createControl,
     formState: { errors: createErrors },
   } = useForm<CreateTransactionFormData>({
     resolver: zodResolver(createTransactionSchema),
@@ -57,6 +62,7 @@ export const AdminTransactions: React.FC = () => {
     register: updateRegister,
     handleSubmit: updateHandleSubmit,
     reset: updateReset,
+    control: updateControl,
     formState: { errors: updateErrors },
   } = useForm<Partial<CreateTransactionFormData>>({
     resolver: zodResolver(createTransactionSchema.partial()),
@@ -65,12 +71,33 @@ export const AdminTransactions: React.FC = () => {
   const watchedType = createWatch('type');
   const watchedAccountId = createWatch('accountId');
 
+  useEffect(() => {
+    let active = true;
+    api.getAdminAccounts()
+      .then((data) => {
+        if (active) setAccounts(data);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Failed to load accounts';
+        showToast({ type: 'error', title: 'Error', message });
+      })
+      .finally(() => {
+        if (active) setIsAccountsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [showToast]);
+
   const handleCreate = async (data: CreateTransactionFormData) => {
     setIsSubmitting(true);
     try {
-      // Find user for the account
-      const userId = users.find((u) => u.id === data.accountId)?.id || 1;
-      await api.createTransaction(userId, data);
+      const account = accounts.find((item) => item.id === data.accountId);
+      if (!account) {
+        throw new Error('Select a valid account for this transaction.');
+      }
+      await api.createTransaction(account.userId, data);
       showToast({ type: 'success', title: 'Transaction Created', message: 'Transaction has been created successfully' });
       createReset();
       setIsCreateOpen(false);
@@ -245,7 +272,10 @@ export const AdminTransactions: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Transaction Management</h1>
           <p className="text-sm text-gray-600 mt-1">View, create, and manage all transactions</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link to={ROUTES.ADMIN_USERS}>
+            <Button variant="secondary" className="w-full">User Management</Button>
+          </Link>
           <Button variant="ghost" size="sm" onClick={() => refetch()}>
             Refresh
           </Button>
@@ -270,7 +300,7 @@ export const AdminTransactions: React.FC = () => {
             </div>
             <Select
               value={typeFilter}
-              onChange={(value) => setTypeFilter(value)}
+              onChange={(e) => setTypeFilter(e.target.value)}
               options={[
                 { value: '', label: 'All Types' },
                 ...TRANSACTION_TYPES,
@@ -279,7 +309,7 @@ export const AdminTransactions: React.FC = () => {
             />
             <Select
               value={statusFilter}
-              onChange={(value) => setStatusFilter(value)}
+              onChange={(e) => setStatusFilter(e.target.value)}
               options={[
                 { value: '', label: 'All Statuses' },
                 ...TRANSACTION_STATUSES,
@@ -288,7 +318,7 @@ export const AdminTransactions: React.FC = () => {
             />
             <Select
               value={userFilter}
-              onChange={(value) => setUserFilter(value)}
+              onChange={(e) => setUserFilter(e.target.value)}
               options={[
                 { value: '', label: 'All Users' },
                 ...users.map((u) => ({ value: u.id.toString(), label: `${u.firstName} ${u.lastName} (${u.username})` })),
@@ -323,25 +353,58 @@ export const AdminTransactions: React.FC = () => {
         size="lg"
       >
         <form onSubmit={createHandleSubmit(handleCreate)} className="space-y-4" noValidate>
-          <Select
-            {...createRegister('accountId', { valueAsNumber: true })}
-            label="Account"
-            options={users.flatMap((u) =>
-              u.id // This would need accounts from the user
-            ).map((acc) => ({ value: acc.id.toString(), label: `${acc.nickname || acc.accountType} ••••${acc.accountNumber.slice(-4)}` }))}
-            disabled={isSubmitting}
+          <Controller
+            control={createControl}
+            name="accountId"
+            render={({ field }) => (
+              <Select
+                ref={field.ref}
+                label="Account"
+                value={field.value?.toString() || ''}
+                placeholder="Select an account"
+                onChange={(event) => field.onChange(Number(event.target.value))}
+                onBlur={field.onBlur}
+                options={accounts.map((account) => ({
+                  value: account.id.toString(),
+                  label: `${account.nickname || account.accountType} ••••${account.accountNumber.slice(-4)} (${account.username})`,
+                }))}
+                disabled={isSubmitting || isAccountsLoading || accounts.length === 0}
+              />
+            )}
           />
-          <Select
-            {...createRegister('type')}
-            label="Type"
-            options={TRANSACTION_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-            disabled={isSubmitting}
+          <Controller
+            control={createControl}
+            name="type"
+            render={({ field }) => (
+              <Select
+                ref={field.ref}
+                label="Type"
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                onBlur={field.onBlur}
+                options={TRANSACTION_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                disabled={isSubmitting}
+              />
+            )}
           />
-          <Select
-            {...createRegister('category')}
-            label="Category (Optional)"
-            options={TRANSACTION_CATEGORIES.map((c) => ({ value: c, label: c }))}
-            disabled={isSubmitting}
+          <Controller
+            control={createControl}
+            name="category"
+            render={({ field }) => (
+              <Select
+                ref={field.ref}
+                label="Category (Optional)"
+                value={field.value || ''}
+                placeholder="No category"
+                onChange={(event) => field.onChange(event.target.value || undefined)}
+                onBlur={field.onBlur}
+                options={[
+                  { value: '', label: 'No category' },
+                  ...TRANSACTION_CATEGORIES.map((category) => ({ value: category, label: category })),
+                ]}
+                disabled={isSubmitting}
+              />
+            )}
           />
           <Input
             {...createRegister('description')}
@@ -357,11 +420,20 @@ export const AdminTransactions: React.FC = () => {
             placeholder="0.00"
             disabled={isSubmitting}
           />
-          <Select
-            {...createRegister('status')}
-            label="Status"
-            options={TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
-            disabled={isSubmitting}
+          <Controller
+            control={createControl}
+            name="status"
+            render={({ field }) => (
+              <Select
+                ref={field.ref}
+                label="Status"
+                value={field.value || 'completed'}
+                onChange={(event) => field.onChange(event.target.value)}
+                onBlur={field.onBlur}
+                options={TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+                disabled={isSubmitting}
+              />
+            )}
           />
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <Button type="button" variant="secondary" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
@@ -396,19 +468,41 @@ export const AdminTransactions: React.FC = () => {
               defaultValue={editingTransaction.amount}
               disabled={isSubmitting}
             />
-            <Select
-              {...updateRegister('status')}
-              label="Status"
-              options={TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+            <Controller
+              control={updateControl}
+              name="status"
               defaultValue={editingTransaction.status}
-              disabled={isSubmitting}
+              render={({ field }) => (
+                <Select
+                  ref={field.ref}
+                  label="Status"
+                  value={field.value || editingTransaction.status}
+                  onChange={(event) => field.onChange(event.target.value)}
+                  onBlur={field.onBlur}
+                  options={TRANSACTION_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+                  disabled={isSubmitting}
+                />
+              )}
             />
-            <Select
-              {...updateRegister('category')}
-              label="Category"
-              options={TRANSACTION_CATEGORIES.map((c) => ({ value: c, label: c }))}
+            <Controller
+              control={updateControl}
+              name="category"
               defaultValue={editingTransaction.category || ''}
-              disabled={isSubmitting}
+              render={({ field }) => (
+                <Select
+                  ref={field.ref}
+                  label="Category"
+                  value={field.value || ''}
+                  placeholder="No category"
+                  onChange={(event) => field.onChange(event.target.value || undefined)}
+                  onBlur={field.onBlur}
+                  options={[
+                    { value: '', label: 'No category' },
+                    ...TRANSACTION_CATEGORIES.map((category) => ({ value: category, label: category })),
+                  ]}
+                  disabled={isSubmitting}
+                />
+              )}
             />
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
               <Button type="button" variant="secondary" onClick={() => setEditingTransaction(null)} disabled={isSubmitting}>

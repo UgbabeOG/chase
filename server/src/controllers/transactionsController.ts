@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { database } from '../db/index.js';
+import { database, saveDatabase } from '../db/index.js';
 import { AuthRequest, Transaction, TransactionWithAccount, ApiResponse, PaginatedResponse, TransferRequest, TransferResponse } from '../types/index.js';
 import { AppError, asyncHandler } from '../middleware/index.js';
 
@@ -103,6 +103,21 @@ export const transfer = asyncHandler(async (req: AuthRequest, res: Response): Pr
 
   const { fromAccountId, toAccountNumber, amount, description } = req.body as TransferRequest;
 
+  const user = await (await database.prepare(
+    'SELECT transactions_blocked FROM users WHERE id = ?'
+  )).get(req.user.userId) as { transactions_blocked: number } | undefined;
+
+  if (user?.transactions_blocked) {
+    const setting = await (await database.prepare(
+      'SELECT setting_value FROM app_settings WHERE setting_key = ?'
+    )).get('transaction_block_message') as { setting_value: string } | undefined;
+    throw new AppError(
+      'TRANSACTIONS_BLOCKED',
+      setting?.setting_value ?? 'Transactions are currently disabled for your account. Please contact support.',
+      403,
+    );
+  }
+
   if (amount <= 0) {
     throw new AppError('INVALID_AMOUNT', 'Transfer amount must be positive', 400);
   }
@@ -182,6 +197,7 @@ export const transfer = asyncHandler(async (req: AuthRequest, res: Response): Pr
       JSON.stringify({ fromAccountId: fromAccount.id, fromAccountNumber: fromAccount.account_number })
     );
   });
+  saveDatabase();
 
   const outTransaction = await (await database.prepare(`
     SELECT t.*, a.account_type, a.nickname as account_nickname

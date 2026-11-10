@@ -1,5 +1,5 @@
-import { jsx as _jsx } from "react/jsx-runtime";
-export const Badge = ({ children, variant = 'gray', size = 'md', className = '' }) => {
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export const Badge = ({ children, variant = 'gray', size = 'md', className = '', onRemove }) => {
     const variantClasses = {
         success: 'bg-green-50 text-green-700',
         warning: 'bg-yellow-50 text-yellow-700',
@@ -11,7 +11,7 @@ export const Badge = ({ children, variant = 'gray', size = 'md', className = '' 
         sm: 'px-2 py-0.5 text-xs',
         md: 'px-2.5 py-0.5 text-xs',
     };
-    return (_jsx("span", { className: `inline-flex items-center rounded-full font-medium ${variantClasses[variant]} ${sizeClasses[size]} ${className}`, children: children }));
+    return (_jsxs("span", { className: `inline-flex items-center gap-1.5 rounded-full font-medium ${variantClasses[variant]} ${sizeClasses[size]} ${className}`, children: [children, onRemove && (_jsx("button", { type: "button", onClick: onRemove, className: "flex items-center justify-center w-4 h-4 rounded-full hover:bg-black/10 transition-colors", "aria-label": "Remove filter", children: _jsx("svg", { className: "w-3 h-3", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: _jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) }))] }));
 };
 const statusVariantMap = {
     completed: 'success',

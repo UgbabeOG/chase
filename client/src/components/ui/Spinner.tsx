@@ -71,8 +71,8 @@ export const SkeletonText: React.FC<{ lines?: number; className?: string }> = ({
   </div>
 );
 
-export const SkeletonCard: React.FC = () => (
-  <div className="card p-6 animate-pulse">
+export const SkeletonCard: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`card p-6 animate-pulse ${className}`}>
     <div className="flex items-center gap-4">
       <Skeleton className="w-12 h-12 rounded-full" />
       <div className="flex-1">

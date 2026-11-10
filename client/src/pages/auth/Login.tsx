@@ -1,21 +1,20 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { LoginForm, TwoFactorForm } from '../../components/forms';
 import { useAuth } from '../../store/AuthContext';
 import { ROUTES } from '../../utils/constants';
 
 export const Login: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [show2FA, setShow2FA] = useState(false);
 
   if (isAuthenticated) {
-    navigate(ROUTES.DASHBOARD);
-    return null;
+    return <Navigate to={user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD} replace />;
   }
 
   const handleLoginSuccess = () => {
-    navigate(ROUTES.DASHBOARD);
+    navigate(user?.role === 'admin' ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD);
   };
 
   const handleSwitchTo2FA = () => {

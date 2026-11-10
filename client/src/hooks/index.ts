@@ -64,12 +64,15 @@ export function useTransactions(params?: { accountId?: number; page?: number; li
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const accountId = params?.accountId;
+  const limit = params?.limit || 20;
+  const initialPage = params?.page || 1;
 
   const fetchTransactions = useCallback(async (page = 1) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getTransactions({ ...params, page, limit: params?.limit || 20 });
+      const data = await api.getTransactions({ accountId, page, limit });
       setTransactions(data.data);
       setPagination(data.meta);
     } catch (err: unknown) {
@@ -79,11 +82,11 @@ export function useTransactions(params?: { accountId?: number; page?: number; li
     } finally {
       setIsLoading(false);
     }
-  }, [params, showToast]);
+  }, [accountId, limit, showToast]);
 
   useEffect(() => {
-    fetchTransactions(params?.page || 1);
-  }, [fetchTransactions, params?.page, params?.accountId]);
+    fetchTransactions(initialPage);
+  }, [fetchTransactions, initialPage]);
 
   return { transactions, pagination, isLoading, error, refetch: fetchTransactions };
 }
@@ -116,12 +119,16 @@ export function useAdminUsers(params?: { page?: number; limit?: number; search?:
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const initialPage = params?.page || 1;
+  const limit = params?.limit || 20;
+  const search = params?.search;
+  const role = params?.role;
 
-  const fetchUsers = useCallback(async (page = 1) => {
+  const fetchUsers = useCallback(async (page = initialPage) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getUsers({ ...params, page, limit: params?.limit || 20 });
+      const data = await api.getUsers({ page, limit, search, role });
       setUsers(data.data);
       setPagination(data.meta);
     } catch (err: unknown) {
@@ -131,11 +138,11 @@ export function useAdminUsers(params?: { page?: number; limit?: number; search?:
     } finally {
       setIsLoading(false);
     }
-  }, [params, showToast]);
+  }, [initialPage, limit, search, role, showToast]);
 
   useEffect(() => {
-    fetchUsers(params?.page || 1);
-  }, [fetchUsers, params?.page, params?.search, params?.role]);
+    fetchUsers(initialPage);
+  }, [fetchUsers, initialPage]);
 
   return { users, pagination, isLoading, error, refetch: fetchUsers };
 }
@@ -146,12 +153,18 @@ export function useAdminTransactions(params?: { page?: number; limit?: number; u
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const initialPage = params?.page || 1;
+  const limit = params?.limit || 20;
+  const userId = params?.userId;
+  const accountId = params?.accountId;
+  const type = params?.type;
+  const status = params?.status;
 
-  const fetchTransactions = useCallback(async (page = 1) => {
+  const fetchTransactions = useCallback(async (page = initialPage) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getAllTransactions({ ...params, page, limit: params?.limit || 20 });
+      const data = await api.getAllTransactions({ page, limit, userId, accountId, type, status });
       setTransactions(data.data);
       setPagination(data.meta);
     } catch (err: unknown) {
@@ -161,11 +174,11 @@ export function useAdminTransactions(params?: { page?: number; limit?: number; u
     } finally {
       setIsLoading(false);
     }
-  }, [params, showToast]);
+  }, [initialPage, limit, userId, accountId, type, status, showToast]);
 
   useEffect(() => {
-    fetchTransactions(params?.page || 1);
-  }, [fetchTransactions, params?.page, params?.userId, params?.accountId, params?.type, params?.status]);
+    fetchTransactions(initialPage);
+  }, [fetchTransactions, initialPage]);
 
   return { transactions, pagination, isLoading, error, refetch: fetchTransactions };
 }

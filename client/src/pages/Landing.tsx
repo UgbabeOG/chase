@@ -1,0 +1,294 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Shield, Smartphone, CreditCard, Users, Lock, Globe, Building2, Award, TrendingUp } from 'lucide-react';
+import { ROUTES } from '../utils/constants';
+
+const features = [
+  {
+    icon: Shield,
+    title: 'Advanced Security',
+    description: 'Bank-grade encryption, two-factor authentication, and real-time fraud monitoring protect your accounts 24/7.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Mobile Banking',
+    description: 'Manage your finances anywhere with our award-winning mobile app. Deposit checks, pay bills, and track spending on the go.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Credit Cards',
+    description: 'Earn rewards on every purchase with our suite of credit cards. Cash back, travel points, and premium benefits.',
+  },
+  {
+    icon: Users,
+    title: 'Customer Support',
+    description: '24/7 dedicated support via phone, chat, or secure messaging. We\'re here when you need us.',
+  },
+  {
+    icon: Lock,
+    title: 'Identity Protection',
+    description: 'Comprehensive identity theft protection with credit monitoring, alerts, and restoration services.',
+  },
+  {
+    icon: Globe,
+    title: 'Global Access',
+    description: 'Access your accounts from anywhere in the world with our international banking network and fee-free ATMs.',
+  },
+];
+
+const stats = [
+  { value: '80M+', label: 'Active Customers' },
+  { value: '$4T+', label: 'Assets Under Management' },
+  { value: '4,700+', label: 'Branches Nationwide' },
+  { value: '16,000+', label: 'Fee-Free ATMs' },
+];
+
+const products = [
+  {
+    icon: Building2,
+    title: 'Checking Accounts',
+    description: 'Everyday banking with no monthly fees, direct deposit, and instant transfers.',
+    cta: 'Open Account',
+  },
+  {
+    icon: Award,
+    title: 'Savings Accounts',
+    description: 'Competitive APY with automatic savings tools and no minimum balance.',
+    cta: 'Start Saving',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Investments',
+    description: 'Self-directed and managed portfolios with commission-free trades.',
+    cta: 'Invest Now',
+  },
+  {
+    icon: CreditCard,
+    title: 'Credit Cards',
+    description: 'Earn cash back, travel rewards, or premium perks on every purchase.',
+    cta: 'Compare Cards',
+  },
+  {
+    icon: Smartphone,
+    title: 'Mobile App',
+    description: 'Bank on the go with mobile deposit, bill pay, and spending insights.',
+    cta: 'Download',
+  },
+  {
+    icon: Users,
+    title: 'Small Business',
+    description: 'Business checking, lending, and merchant services to help you grow.',
+    cta: 'Learn More',
+  },
+];
+
+export const Landing: React.FC = () => {
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-chase-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
+          <div className="text-center max-w-3xl mx-auto">
+            <Link to={ROUTES.LOGIN} className="inline-flex items-center gap-2 mb-8" aria-label="Chase Bank Home">
+              <svg className="w-12 h-12 text-chase-600" viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="8" fill="#002147" />
+                <path d="M16 6L24 14H8L16 6Z" fill="#FFFFFF" />
+                <path d="M16 18L8 26H24L16 18Z" fill="#FFFFFF" opacity="0.6" />
+              </svg>
+              <span className="text-3xl font-bold text-gray-900">Chase</span>
+            </Link>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 tracking-tight mb-6">
+              Banking that{' '}
+              <span className="chase-gradient gradient-text">works for you</span>
+            </h1>
+            <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+              From everyday banking to long-term wealth building, Chase provides the tools, expertise, and security
+              to help you achieve your financial goals.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                to={ROUTES.LOGIN}
+                className="btn-primary btn-lg w-full sm:w-auto px-8 py-3.5"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="#open-account"
+                className="btn-secondary btn-lg w-full sm:w-auto px-8 py-3.5"
+              >
+                Open an Account
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Trust Indicators */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            {stats.map((stat, index) => (
+              <div key={index} className="py-6">
+                <div className="text-3xl sm:text-4xl font-bold text-chase-900 mb-1">{stat.value}</div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20 sm:py-28 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Everything you need in one place
+            </h2>
+            <p className="text-lg text-gray-600">
+              Comprehensive banking solutions designed around your life
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <article
+                key={index}
+                className="card-hover p-8 h-full transition-all duration-300"
+              >
+                <div className="w-14 h-14 rounded-xl bg-chase-50 flex items-center justify-center mb-6 text-chase-600">
+                  <feature.icon className="w-7 h-7" aria-hidden="true" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">{feature.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Products Section */}
+      <section id="open-account" className="py-20 sm:py-28 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              Products built for your goals
+            </h2>
+            <p className="text-lg text-gray-600">
+              Choose the right financial tools for every stage of life
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {products.map((product, index) => (
+              <article
+                key={index}
+                className="card-hover p-8 h-full bg-white transition-all duration-300"
+              >
+                <div className="w-14 h-14 rounded-xl bg-chase-50 flex items-center justify-center mb-6 text-chase-600">
+                  <product.icon className="w-7 h-7" aria-hidden="true" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">{product.title}</h3>
+                <p className="text-gray-600 mb-6 leading-relaxed">{product.description}</p>
+                <a
+                  href="#"
+                  className="inline-flex items-center gap-2 font-medium text-chase-600 hover:text-chase-700 transition-colors"
+                >
+                  {product.cta}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 sm:py-28 bg-chase-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
+            Ready to get started?
+          </h2>
+          <p className="text-lg text-chase-200 mb-10 max-w-2xl mx-auto">
+            Join millions of customers who trust Chase for their banking needs.
+            Open an account online in minutes.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              to={ROUTES.LOGIN}
+              className="btn-primary btn-lg w-full sm:w-auto px-8 py-3.5 bg-white text-chase-600 hover:bg-chase-50"
+            >
+              Sign In to Your Account
+            </Link>
+            <a
+              href="#"
+              className="btn-lg w-full sm:w-auto px-8 py-3.5 border-2 border-white text-white hover:bg-white/10 transition-colors"
+            >
+              Open New Account
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-chase-950 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12">
+            <div>
+              <Link to="/" className="inline-flex items-center gap-2 mb-6" aria-label="Chase Bank Home">
+                <svg className="w-10 h-10" viewBox="0 0 32 32" fill="none">
+                  <rect width="32" height="32" rx="8" fill="#002147" />
+                  <path d="M16 6L24 14H8L16 6Z" fill="#FFFFFF" />
+                  <path d="M16 18L8 26H24L16 18Z" fill="#FFFFFF" opacity="0.6" />
+                </svg>
+                <span className="text-xl font-bold">Chase</span>
+              </Link>
+              <p className="text-chase-300 text-sm leading-relaxed">
+                JPMorgan Chase & Co. is a leading global financial services firm with assets of $4 trillion
+                and operations worldwide.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Personal Banking</h4>
+              <ul className="space-y-3 text-chase-300 text-sm">
+                <li><a href="#" className="hover:text-white transition-colors">Checking & Savings</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Credit Cards</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Mortgages</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Auto Loans</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Investing</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Business Banking</h4>
+              <ul className="space-y-3 text-chase-300 text-sm">
+                <li><a href="#" className="hover:text-white transition-colors">Business Checking</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Business Loans</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Merchant Services</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Commercial Banking</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Asset Management</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Support</h4>
+              <ul className="space-y-3 text-chase-300 text-sm">
+                <li><a href="#" className="hover:text-white transition-colors">Customer Service</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Find a Branch</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Security Center</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Accessibility</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-chase-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-chase-400 text-sm">
+              &copy; {new Date().getFullYear()} JPMorgan Chase & Co. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6 text-chase-400 text-sm">
+              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+              <a href="#" className="hover:text-white transition-colors">Cookie Policy</a>
+              <a href="#" className="hover:text-white transition-colors">Ad Choices</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};

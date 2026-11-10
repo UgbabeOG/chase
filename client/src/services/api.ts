@@ -1,7 +1,24 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'axios';
-import type { ApiResponse, LoginResponse, LoginRequest, User, Account, Transaction, PaginatedResponse, TransferRequest, TransferResponse, Setup2FAResponse, AdminCreateUserRequest, AdminUpdateUserRequest, AdminUpdateBalanceRequest, AdminCreateTransactionRequest } from '../types/api';
+import type { ApiResponse, LoginResponse, LoginRequest, User, Account, AdminAccount, Transaction, PaginatedResponse, TransferRequest, TransferResponse, Setup2FAResponse, AdminCreateUserRequest, AdminUpdateUserRequest, AdminUpdateTwoFactorRequest, AdminUpdateBalanceRequest, AdminCreateTransactionRequest, TransactionPolicy } from '../types/api';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+export function camelCaseKeys<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => camelCaseKeys(item)) as T;
+  }
+
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+        camelCaseKeys(nestedValue),
+      ]),
+    ) as T;
+  }
+
+  return value;
+}
 
 class ApiService {
   private client: AxiosInstance;
@@ -28,7 +45,12 @@ class ApiService {
     );
 
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+          response.data.data = camelCaseKeys(response.data.data);
+        }
+        return response;
+      },
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -78,7 +100,7 @@ class ApiService {
     return this.refreshTokenPromise;
   }
 
-  private clearAuth(): void {
+  clearAuth(): void {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
@@ -97,7 +119,7 @@ class ApiService {
     const { accessToken, refreshToken, user } = response.data.data!;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(camelCaseKeys(user)));
     return response.data.data!;
   }
 
@@ -106,7 +128,7 @@ class ApiService {
     const { accessToken, refreshToken, user } = response.data.data!;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(camelCaseKeys(user)));
     return response.data.data!;
   }
 
@@ -121,7 +143,7 @@ class ApiService {
   async getMe(): Promise<User> {
     const response = await this.client.get<ApiResponse<User>>('/auth/me');
     const user = response.data.data!;
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(camelCaseKeys(user)));
     return user;
   }
 
@@ -187,6 +209,21 @@ class ApiService {
     return response.data.data!;
   }
 
+  async getAdminAccounts(): Promise<AdminAccount[]> {
+    const response = await this.client.get<ApiResponse<AdminAccount[]>>('/admin/accounts');
+    return response.data.data!;
+  }
+
+  async getTransactionPolicy(): Promise<TransactionPolicy> {
+    const response = await this.client.get<ApiResponse<TransactionPolicy>>('/admin/transaction-policy');
+    return response.data.data!;
+  }
+
+  async updateTransactionPolicy(policy: TransactionPolicy): Promise<TransactionPolicy> {
+    const response = await this.client.put<ApiResponse<TransactionPolicy>>('/admin/transaction-policy', policy);
+    return response.data.data!;
+  }
+
   async getUser(id: number): Promise<{ user: User; accounts: Account[] }> {
     const response = await this.client.get<ApiResponse<{ user: User; accounts: Account[] }>>(`/admin/users/${id}`);
     return response.data.data!;
@@ -199,6 +236,11 @@ class ApiService {
 
   async updateUser(id: number, data: AdminUpdateUserRequest): Promise<User> {
     const response = await this.client.put<ApiResponse<User>>(`/admin/users/${id}`, data);
+    return response.data.data!;
+  }
+
+  async updateUserTwoFactor(id: number, data: AdminUpdateTwoFactorRequest): Promise<{ otpEnabled: boolean }> {
+    const response = await this.client.put<ApiResponse<{ otpEnabled: boolean }>>(`/admin/users/${id}/2fa`, data);
     return response.data.data!;
   }
 

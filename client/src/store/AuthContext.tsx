@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { api } from '../services/api';
+import { api, camelCaseKeys } from '../services/api';
 import type { User } from '../types/api';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isLoggingOut: boolean;
   login: (username: string, password: string, otp?: string) => Promise<{ requires2FA?: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const refreshUser = useCallback(async () => {
     if (!api.isAuthenticated()) {
@@ -42,7 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Transform snake_case to camelCase for any existing stored users
+        setUser(camelCaseKeys(parsedUser));
       } catch {
         localStorage.removeItem('user');
       }
@@ -68,10 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    setIsLoggingOut(true);
     try {
       await api.logout();
+      // Simulate backend processing for 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } finally {
       setUser(null);
+      setIsLoggingOut(false);
     }
   };
 
@@ -95,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        isLoggingOut,
         login,
         logout,
         refreshUser,
@@ -106,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
 export function useAuth() {
   const context = useContext(AuthContext);
