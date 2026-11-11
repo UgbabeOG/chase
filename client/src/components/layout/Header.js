@@ -42,8 +42,11 @@ export const Header = () => {
                                             { label: 'Settings', value: 'settings', icon: _jsx(Settings, { className: "w-4 h-4" }) },
                                             { label: 'Sign out', value: 'logout', icon: _jsx(LogOut, { className: "w-4 h-4" }), danger: true },
                                         ], onSelect: (value) => {
-                                            if (value === 'profile') navigate(ROUTES.PROFILE);
-                                            else if (value === 'settings') navigate(ROUTES.SETTINGS);
-                                            else if (value === 'logout') setConfirmSignOut(true);
+                                            if (value === 'profile')
+                                                navigate(ROUTES.PROFILE);
+                                            else if (value === 'settings')
+                                                navigate(ROUTES.SETTINGS);
+                                            else if (value === 'logout')
+                                                setConfirmSignOut(true);
                                         }, disabled: isLoggingOut })), isLoggingOut && (_jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-600", children: [_jsx(Loader2, { className: "w-4 h-4 animate-spin text-chase-600" }), _jsx("span", { className: "hidden sm:inline", children: "Signing out..." })] }))] })] }) }) }), _jsx(ConfirmModal, { isOpen: confirmSignOut, onClose: () => setConfirmSignOut(false), onConfirm: handleSignOut, title: "Sign out?", message: "Are you sure you want to sign out of your account?", confirmText: "Sign out", variant: "danger", isLoading: isLoggingOut })] }));
 };

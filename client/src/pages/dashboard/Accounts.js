@@ -1,9 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Link } from 'react-router-dom';
 import { useAccounts, useTransactions } from '../../hooks';
-import { AccountCard } from '../../components/data-display';
-import { BalanceDisplay } from '../../components/data-display';
-import { TransactionRow } from '../../components/data-display';
+import { AccountCard, BalanceDisplay, TransactionRow, TransactionReceiptModal } from '../../components/data-display';
 import { Button, SkeletonCard } from '../../components/ui';
 import { ROUTES } from '../../utils/constants';
 import { useState } from 'react';
@@ -27,12 +25,14 @@ export const Accounts = () => {
 };
 const AccountTransactions = ({ accountId, onClose }) => {
     const { transactions, isLoading, pagination, refetch } = useTransactions({ accountId, limit: 20 });
+    const { accounts } = useAccounts();
     const [page, setPage] = useState(1);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
     if (isLoading) {
         return (_jsx("div", { className: "space-y-4", children: [...Array(5)].map((_, i) => (_jsx("div", { className: "p-4 animate-pulse", children: _jsxs("div", { className: "flex items-center gap-4", children: [_jsx("div", { className: "w-10 h-10 rounded-xl bg-gray-200" }), _jsxs("div", { className: "flex-1", children: [_jsx("div", { className: "h-4 w-3/4 bg-gray-200 rounded" }), _jsx("div", { className: "h-3 w-1/2 bg-gray-200 rounded mt-1" })] })] }) }, i))) }));
     }
     if (transactions.length === 0) {
         return (_jsxs("div", { className: "text-center py-12", children: [_jsx("svg", { className: "mx-auto h-12 w-12 text-gray-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: _jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5, d: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" }) }), _jsx("h3", { className: "mt-2 text-sm font-medium text-gray-900", children: "No transactions" }), _jsx("p", { className: "mt-1 text-sm text-gray-500", children: "This account has no recent activity" })] }));
     }
-    return (_jsxs("div", { className: "space-y-4", children: [transactions.map((transaction) => (_jsx(TransactionRow, { transaction: transaction }, transaction.id))), pagination.totalPages > 1 && (_jsxs("div", { className: "flex items-center justify-between pt-4 border-t border-gray-200", children: [_jsx("button", { onClick: () => setPage((p) => Math.max(1, p - 1)), disabled: page === 1, className: "p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 rounded-lg", children: "Previous" }), _jsxs("span", { className: "text-sm text-gray-500", children: ["Page ", page, " of ", pagination.totalPages] }), _jsx("button", { onClick: () => setPage((p) => Math.min(pagination.totalPages, p + 1)), disabled: page === pagination.totalPages, className: "p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 rounded-lg", children: "Next" })] }))] }));
+    return (_jsxs("div", { className: "space-y-4", children: [transactions.map((transaction) => (_jsx(TransactionRow, { transaction: transaction, onClick: () => setSelectedTransaction(transaction) }, transaction.id))), pagination.totalPages > 1 && (_jsxs("div", { className: "flex items-center justify-between pt-4 border-t border-gray-200", children: [_jsx("button", { onClick: () => setPage((p) => Math.max(1, p - 1)), disabled: page === 1, className: "p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 rounded-lg", children: "Previous" }), _jsxs("span", { className: "text-sm text-gray-500", children: ["Page ", page, " of ", pagination.totalPages] }), _jsx("button", { onClick: () => setPage((p) => Math.min(pagination.totalPages, p + 1)), disabled: page === pagination.totalPages, className: "p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 rounded-lg", children: "Next" })] })), _jsx(TransactionReceiptModal, { isOpen: !!selectedTransaction, onClose: () => setSelectedTransaction(null), transaction: selectedTransaction, accounts: accounts })] }));
 };
