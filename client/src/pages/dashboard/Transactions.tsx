@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, Filter, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAccounts, useTransactions } from '../../hooks';
-import { TransactionTable, TransactionFilters as TransactionFiltersComponent, type TransactionFilters } from '../../components/data-display';
+import { TransactionTable, TransactionFilters as TransactionFiltersComponent, TransactionReceiptModal, type TransactionFilters } from '../../components/data-display';
 import { Button, Card, Badge, Select, SkeletonCard } from '../../components/ui';
 import { formatRelativeTime } from '../../utils';
 import { TRANSACTION_CATEGORIES } from '../../utils/constants';
@@ -17,6 +17,7 @@ export const Transactions: React.FC = () => {
     endDate: undefined,
   });
   const [page, setPage] = useState(1);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
     key: 'createdAt',
     direction: 'desc',
@@ -142,7 +143,16 @@ export const Transactions: React.FC = () => {
         pagination={pagination}
         onPageChange={setPage}
         isLoading={isLoading}
+        onRowClick={setSelectedTransaction}
+        onViewReceipt={setSelectedTransaction}
         emptyMessage="No transactions found matching your filters"
+      />
+
+      <TransactionReceiptModal
+        isOpen={!!selectedTransaction}
+        onClose={() => setSelectedTransaction(null)}
+        transaction={selectedTransaction}
+        accounts={accounts}
       />
 
       <div className="flex items-center justify-between pt-4">

@@ -2,13 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { CreditCard, ArrowUpRight, Plus, Eye, EyeOff, Copy, Check, MoreHorizontal, ArrowRight } from 'lucide-react';
 import { useAccounts, useTransactions } from '../../hooks';
-import { AccountCard } from '../../components/data-display';
-import { BalanceDisplay } from '../../components/data-display';
-import { TransactionRow } from '../../components/data-display';
+import { AccountCard, BalanceDisplay, TransactionRow, TransactionReceiptModal } from '../../components/data-display';
 import { Button, Card, Badge, SkeletonCard } from '../../components/ui';
 import { formatCurrency, formatAccountNumber, formatRelativeTime, formatDate } from '../../utils';
 import { ROUTES } from '../../utils/constants';
 import { useState } from 'react';
+import type { Transaction } from '../../types/api';
 
 export const Accounts: React.FC = () => {
   const { accounts, isLoading, refetch } = useAccounts();
@@ -113,7 +112,9 @@ interface AccountTransactionsProps {
 
 const AccountTransactions: React.FC<AccountTransactionsProps> = ({ accountId, onClose }) => {
   const { transactions, isLoading, pagination, refetch } = useTransactions({ accountId, limit: 20 });
+  const { accounts } = useAccounts();
   const [page, setPage] = useState(1);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   if (isLoading) {
     return (
@@ -148,7 +149,11 @@ const AccountTransactions: React.FC<AccountTransactionsProps> = ({ accountId, on
   return (
     <div className="space-y-4">
       {transactions.map((transaction) => (
-        <TransactionRow key={transaction.id} transaction={transaction} />
+        <TransactionRow
+          key={transaction.id}
+          transaction={transaction}
+          onClick={() => setSelectedTransaction(transaction)}
+        />
       ))}
 
       {pagination.totalPages > 1 && (
@@ -170,6 +175,13 @@ const AccountTransactions: React.FC<AccountTransactionsProps> = ({ accountId, on
           </button>
         </div>
       )}
+
+      <TransactionReceiptModal
+        isOpen={!!selectedTransaction}
+        onClose={() => setSelectedTransaction(null)}
+        transaction={selectedTransaction}
+        accounts={accounts}
+      />
     </div>
   );
 };

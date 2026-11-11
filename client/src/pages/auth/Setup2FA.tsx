@@ -118,7 +118,6 @@ export const Setup2FA: React.FC = () => {
               </ul>
 
               <Button className="w-full" size="lg" onClick={handleSetup} isLoading={isLoading}>
-                {isLoading ? <Loader2 className="w-5 h-5 mr-2" /> : null}
                 Continue to QR Code
               </Button>
             </div>

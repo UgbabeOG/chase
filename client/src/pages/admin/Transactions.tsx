@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, X, Download, ChevronDown, ChevronUp, Plus, Edit, Trash2, DollarSign, CreditCard } from 'lucide-react';
+import { Search, Filter, X, Download, ChevronDown, ChevronUp, Plus, Edit, Trash2, DollarSign, CreditCard, Receipt } from 'lucide-react';
 import { useAdminUsers, useAdminTransactions } from '../../hooks';
 import { api } from '../../services/api';
 import { Table, Pagination, Button, Input, Modal, Badge, Select, Card, SkeletonCard } from '../../components/ui';
+import { TransactionReceiptModal } from '../../components/data-display';
 import { formatCurrency, formatDate, formatRelativeTime } from '../../utils';
 import { useToast } from '../../store/ToastContext';
 import { ROUTES, TRANSACTION_CATEGORIES, TRANSACTION_TYPES, TRANSACTION_STATUSES } from '../../utils/constants';
@@ -43,6 +44,7 @@ export const AdminTransactions: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<typeof transactions[0] | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<typeof transactions[0] | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<typeof transactions[0] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -252,10 +254,13 @@ export const AdminTransactions: React.FC = () => {
         header: 'Actions',
         render: (row: typeof transactions[0]) => (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setEditingTransaction(row)} disabled={isSubmitting}>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedReceipt(row)} title="View Receipt">
+              <Receipt className="w-4 h-4 text-chase-600" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setEditingTransaction(row)} disabled={isSubmitting} title="Edit Transaction">
               <Edit className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setDeletingTransaction(row)} disabled={isSubmitting}>
+            <Button variant="ghost" size="sm" onClick={() => setDeletingTransaction(row)} disabled={isSubmitting} title="Delete Transaction">
               <Trash2 className="w-4 h-4 text-red-600" />
             </Button>
           </div>
@@ -541,6 +546,12 @@ export const AdminTransactions: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      <TransactionReceiptModal
+        isOpen={!!selectedReceipt}
+        onClose={() => setSelectedReceipt(null)}
+        transaction={selectedReceipt}
+      />
     </div>
   );
 };

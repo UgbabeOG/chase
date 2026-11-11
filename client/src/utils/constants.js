@@ -48,6 +48,8 @@ export const ROUTES = {
     ACCOUNTS: '/accounts',
     TRANSACTIONS: '/transactions',
     TRANSFER: '/transfer',
+    PROFILE: '/profile',
+    SETTINGS: '/settings',
     ADMIN: '/admin',
     ADMIN_USERS: '/admin/users',
     ADMIN_TRANSACTIONS: '/admin/transactions',

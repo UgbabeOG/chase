@@ -2,18 +2,18 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { CreditCard, ArrowUpRight, TrendingUp, History, Plus, Eye, EyeOff, Copy, Check, MoreHorizontal } from 'lucide-react';
 import { useAccounts, useTransactions } from '../../hooks';
-import { BalanceSummary, BalanceDisplay } from '../../components/data-display';
-import { AccountCard } from '../../components/data-display';
-import { TransactionRow } from '../../components/data-display';
+import { BalanceSummary, BalanceDisplay, AccountCard, TransactionRow, TransactionReceiptModal } from '../../components/data-display';
 import { Button, Badge, Card, SkeletonCard } from '../../components/ui';
 import { formatCurrency, formatAccountNumber, formatRelativeTime, getTransactionTypeColor } from '../../utils';
 import { ROUTES } from '../../utils/constants';
 import { useState } from 'react';
+import type { Transaction } from '../../types/api';
 
 export const Dashboard: React.FC = () => {
   const { accounts, isLoading: accountsLoading, refetch: refetchAccounts } = useAccounts();
   const { transactions, isLoading: transactionsLoading } = useTransactions({ limit: 5 });
   const [showBalances, setShowBalances] = useState(true);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
   const totalAvailable = accounts.reduce((sum, acc) => sum + acc.availableBalance, 0);
@@ -107,11 +107,22 @@ export const Dashboard: React.FC = () => {
         ) : (
           <div className="divide-y divide-gray-100">
             {transactions.map((transaction) => (
-              <TransactionRow key={transaction.id} transaction={transaction} onClick={() => {}} />
+              <TransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                onClick={() => setSelectedTransaction(transaction)}
+              />
             ))}
           </div>
         )}
       </div>
+
+      <TransactionReceiptModal
+        isOpen={!!selectedTransaction}
+        onClose={() => setSelectedTransaction(null)}
+        transaction={selectedTransaction}
+        accounts={accounts}
+      />
     </div>
   );
 };

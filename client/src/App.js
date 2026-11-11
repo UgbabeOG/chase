@@ -5,6 +5,8 @@ import { Landing } from './pages/Landing';
 import { Login, TwoFactor, Setup2FA } from './pages/auth';
 import { Dashboard, Accounts, Transactions } from './pages/dashboard';
 import { Transfer } from './pages/transfers';
+import { Profile } from './pages/profile';
+import { Settings } from './pages/settings';
 import { AdminUsers, AdminTransactions } from './pages/admin';
 import { NotFound } from './pages/NotFound';
 import { useAuth } from './store/AuthContext';
@@ -41,6 +43,6 @@ const PublicRoute = () => {
     return (_jsx("main", { className: "flex min-h-screen min-h-[100svh] w-full items-center justify-center px-4 py-8 sm:px-6", children: _jsx(Outlet, {}) }));
 };
 const App = () => {
-    return (_jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Landing, {}) }), _jsxs(Route, { element: _jsx(PublicRoute, {}), children: [_jsx(Route, { path: ROUTES.LOGIN, element: _jsx(Login, {}) }), _jsx(Route, { path: ROUTES.TWO_FACTOR, element: _jsx(TwoFactor, {}) }), _jsx(Route, { path: ROUTES.SETUP_2FA, element: _jsx(Setup2FA, {}) })] }), _jsx(Route, { element: _jsx(ProtectedRoute, {}), children: _jsxs(Route, { element: _jsx(Layout, {}), children: [_jsx(Route, { path: ROUTES.DASHBOARD, element: _jsx(Dashboard, {}) }), _jsx(Route, { path: ROUTES.ACCOUNTS, element: _jsx(Accounts, {}) }), _jsx(Route, { path: ROUTES.TRANSACTIONS, element: _jsx(Transactions, {}) }), _jsx(Route, { path: ROUTES.TRANSFER, element: _jsx(Transfer, {}) })] }) }), _jsx(Route, { element: _jsx(AdminRoute, {}), children: _jsxs(Route, { element: _jsx(AdminLayout, {}), children: [_jsx(Route, { path: "/admin/users", element: _jsx(AdminUsers, {}) }), _jsx(Route, { path: "/admin/transactions", element: _jsx(AdminTransactions, {}) }), _jsx(Route, { path: "/admin", element: _jsx(Navigate, { to: "/admin/users", replace: true }) })] }) }), _jsx(Route, { path: "*", element: _jsx(NotFound, {}) })] }));
+    return (_jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Landing, {}) }), _jsxs(Route, { element: _jsx(PublicRoute, {}), children: [_jsx(Route, { path: ROUTES.LOGIN, element: _jsx(Login, {}) }), _jsx(Route, { path: ROUTES.TWO_FACTOR, element: _jsx(TwoFactor, {}) }), _jsx(Route, { path: ROUTES.SETUP_2FA, element: _jsx(Setup2FA, {}) })] }), _jsx(Route, { element: _jsx(ProtectedRoute, {}), children: _jsxs(Route, { element: _jsx(Layout, {}), children: [_jsx(Route, { path: ROUTES.DASHBOARD, element: _jsx(Dashboard, {}) }), _jsx(Route, { path: ROUTES.ACCOUNTS, element: _jsx(Accounts, {}) }), _jsx(Route, { path: ROUTES.TRANSACTIONS, element: _jsx(Transactions, {}) }), _jsx(Route, { path: ROUTES.TRANSFER, element: _jsx(Transfer, {}) }), _jsx(Route, { path: ROUTES.PROFILE, element: _jsx(Profile, {}) }), _jsx(Route, { path: ROUTES.SETTINGS, element: _jsx(Settings, {}) })] }) }), _jsx(Route, { element: _jsx(AdminRoute, {}), children: _jsxs(Route, { element: _jsx(AdminLayout, {}), children: [_jsx(Route, { path: "/admin/users", element: _jsx(AdminUsers, {}) }), _jsx(Route, { path: "/admin/transactions", element: _jsx(AdminTransactions, {}) }), _jsx(Route, { path: "/admin", element: _jsx(Navigate, { to: "/admin/users", replace: true }) })] }) }), _jsx(Route, { path: "*", element: _jsx(NotFound, {}) })] }));
 };
 export default App;

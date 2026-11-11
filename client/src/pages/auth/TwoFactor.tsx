@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useAuth } from '../../store/AuthContext';
 import { ROUTES } from '../../utils/constants';
@@ -96,8 +96,7 @@ export const TwoFactor: React.FC = () => {
           </div>
 
           <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-            {isLoading ? <Loader2 className="w-5 h-5 mr-2" /> : null}
-            Verify Code
+            {isLoading ? 'Verifying...' : 'Verify Code'}
           </Button>
 
           <Button type="button" variant="ghost" className="w-full" onClick={() => navigate(ROUTES.LOGIN)}>

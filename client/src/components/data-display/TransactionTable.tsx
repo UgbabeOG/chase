@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Receipt } from 'lucide-react';
 import { Transaction } from '../../types/api';
 import { Table, Pagination, Badge } from '../ui';
 import { formatCurrency, formatDate, formatRelativeTime, getTransactionTypeColor, getTransactionTypeLabel } from '../../utils';
@@ -9,6 +10,7 @@ interface TransactionTableProps {
   onPageChange: (page: number) => void;
   isLoading?: boolean;
   onRowClick?: (transaction: Transaction) => void;
+  onViewReceipt?: (transaction: Transaction) => void;
   emptyMessage?: string;
 }
 
@@ -18,6 +20,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
   onPageChange,
   isLoading,
   onRowClick,
+  onViewReceipt,
   emptyMessage,
 }) => {
   const columns = useMemo(
@@ -85,8 +88,33 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
           return <Badge variant={statusColors[row.status] || 'gray'} size="sm">{row.status}</Badge>;
         },
       },
+      {
+        key: 'receipt',
+        header: 'Receipt',
+        className: 'text-center',
+        headerClassName: 'text-center',
+        render: (row: Transaction) => (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onViewReceipt) {
+                onViewReceipt(row);
+              } else if (onRowClick) {
+                onRowClick(row);
+              }
+            }}
+            className="p-1.5 text-gray-500 hover:text-chase-600 hover:bg-chase-50 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-medium"
+            title="View Receipt"
+            aria-label={`View receipt for ${row.description}`}
+          >
+            <Receipt className="w-4 h-4" />
+            <span className="hidden sm:inline">Receipt</span>
+          </button>
+        ),
+      },
     ],
-    []
+    [onRowClick, onViewReceipt]
   );
 
   return (

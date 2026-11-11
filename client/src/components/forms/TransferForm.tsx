@@ -2,13 +2,15 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Receipt } from 'lucide-react';
 import { Button, Input, Select } from '../ui';
+import { TransactionReceiptModal } from '../data-display';
 import { transferSchema, type TransferFormData } from '../../utils/validation';
 import { useTransfer } from '../../hooks';
 import { useAccounts } from '../../hooks';
 import { formatCurrency, formatAccountNumber } from '../../utils';
 import { useState } from 'react';
+import type { Transaction } from '../../types/api';
 
 export const TransferForm: React.FC = () => {
   const { accounts } = useAccounts();
@@ -16,6 +18,8 @@ export const TransferForm: React.FC = () => {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [completedTransaction, setCompletedTransaction] = useState<Transaction | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const {
     register,
@@ -45,6 +49,7 @@ export const TransferForm: React.FC = () => {
     try {
       const result = await transfer(data);
       setSubmitStatus('success');
+      setCompletedTransaction(result.transaction);
       setSuccessMessage(`Successfully transferred ${formatCurrency(data.amount)} to account ending in ${data.toAccountNumber.slice(-4)}`);
       // Reset form
       setValue('toAccountNumber', '');
@@ -70,9 +75,22 @@ export const TransferForm: React.FC = () => {
   return (
     <div className="space-y-6">
       {submitStatus === 'success' && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3" role="alert">
-          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-          <p className="text-sm text-green-700">{successMessage}</p>
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" role="alert">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+            <p className="text-sm text-green-700">{successMessage}</p>
+          </div>
+          {completedTransaction && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowReceipt(true)}
+              leftIcon={<Receipt className="w-4 h-4" />}
+            >
+              View Receipt
+            </Button>
+          )}
         </div>
       )}
 
@@ -163,7 +181,6 @@ export const TransferForm: React.FC = () => {
         </div>
 
         <Button type="submit" className="w-full" size="lg" isLoading={isLoading} disabled={submitStatus === 'success'}>
-          {isLoading ? <Loader2 className="w-5 h-5 mr-2" /> : null}
           Transfer
         </Button>
 
@@ -171,6 +188,13 @@ export const TransferForm: React.FC = () => {
           Transfers between Chase accounts are typically instant. Transfers to external accounts may take 1-3 business days.
         </p>
       </form>
+
+      <TransactionReceiptModal
+        isOpen={showReceipt}
+        onClose={() => setShowReceipt(false)}
+        transaction={completedTransaction}
+        accounts={accounts}
+      />
     </div>
   );
 };

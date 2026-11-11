@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import { LogOut, User, Settings, ChevronDown, CreditCard, History, ArrowUpRight, LayoutDashboard, Shield, Loader2 } from 'lucide-react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { LogOut, User, Settings, CreditCard, History, ArrowUpRight, LayoutDashboard, Loader2 } from 'lucide-react';
 import { useAuth } from '../../store/AuthContext';
 import { Avatar, ConfirmModal, Dropdown } from '../ui';
 import { useToast } from '../../store/ToastContext';
@@ -10,6 +10,7 @@ import { MobileSidebar } from './MobileSidebar';
 export const Header: React.FC = () => {
   const { user, logout, isAuthenticated, isLoggingOut } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const isAdmin = user?.role === 'admin';
   const homeRoute = isAdmin ? ROUTES.ADMIN_USERS : ROUTES.DASHBOARD;
@@ -78,17 +79,17 @@ export const Header: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
                       <span className="hidden sm:block text-sm font-medium text-gray-700">{user.firstName}</span>
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
                     </div>
                   }
                   items={[
                     { label: 'Profile', value: 'profile', icon: <User className="w-4 h-4" /> },
                     { label: 'Settings', value: 'settings', icon: <Settings className="w-4 h-4" /> },
-                    { label: 'Security', value: 'security', icon: <Shield className="w-4 h-4" /> },
                     { label: 'Sign out', value: 'logout', icon: <LogOut className="w-4 h-4" />, danger: true },
                   ]}
                   onSelect={(value) => {
-                    if (value === 'logout') setConfirmSignOut(true);
+                    if (value === 'profile') navigate(ROUTES.PROFILE);
+                    else if (value === 'settings') navigate(ROUTES.SETTINGS);
+                    else if (value === 'logout') setConfirmSignOut(true);
                   }}
                   disabled={isLoggingOut}
                 />

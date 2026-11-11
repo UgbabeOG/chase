@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button, Input } from '../ui';
 import { loginSchema, type LoginFormData } from '../../utils/validation';
 import { useAuth } from '../../store/AuthContext';
@@ -102,14 +102,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onSwitchTo2FA }
       </div>
 
       <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-        {isLoading ? (
-          <>
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Signing in...
-          </>
-        ) : (
-          'Sign In'
-        )}
+        {isLoading ? 'Signing in...' : 'Sign In'}
       </Button>
 
       <p className="text-center text-sm text-gray-600">
@@ -188,14 +181,7 @@ export const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSuccess, onBack 
       </div>
 
       <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-        {isLoading ? (
-          <>
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Verifying...
-          </>
-        ) : (
-          'Verify Code'
-        )}
+        {isLoading ? 'Verifying...' : 'Verify Code'}
       </Button>
 
       {onBack && (

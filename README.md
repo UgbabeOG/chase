@@ -134,6 +134,7 @@ After running `npm run db:seed`:
 ## Project Structure
 
 ```
+
 chase-bank-clone/
 ├── client/                 # Frontend React application
 │   ├── src/

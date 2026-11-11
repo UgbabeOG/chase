@@ -5,6 +5,8 @@ import { Landing } from './pages/Landing';
 import { Login, TwoFactor, Setup2FA } from './pages/auth';
 import { Dashboard, Accounts, Transactions } from './pages/dashboard';
 import { Transfer } from './pages/transfers';
+import { Profile } from './pages/profile';
+import { Settings } from './pages/settings';
 import { AdminUsers, AdminTransactions } from './pages/admin';
 import { NotFound } from './pages/NotFound';
 import { useAuth } from './store/AuthContext';
@@ -86,6 +88,8 @@ const App: React.FC = () => {
           <Route path={ROUTES.ACCOUNTS} element={<Accounts />} />
           <Route path={ROUTES.TRANSACTIONS} element={<Transactions />} />
           <Route path={ROUTES.TRANSFER} element={<Transfer />} />
+          <Route path={ROUTES.PROFILE} element={<Profile />} />
+          <Route path={ROUTES.SETTINGS} element={<Settings />} />
         </Route>
       </Route>
 
