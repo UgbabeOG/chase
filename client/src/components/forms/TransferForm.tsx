@@ -57,7 +57,15 @@ export const TransferForm: React.FC = () => {
       setValue('description', '');
     } catch (err: unknown) {
       setSubmitStatus('error');
-      const message = err instanceof Error ? err.message : 'Transfer failed. Please try again.';
+      let message = 'Transfer failed. Please try again.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
+        if (axiosErr.response?.data?.error?.message) {
+          message = axiosErr.response.data.error.message;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       setErrorMessage(message);
     }
   };
