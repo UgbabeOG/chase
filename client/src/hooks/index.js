@@ -95,7 +95,17 @@ export function useTransfer() {
             return result;
         }
         catch (err) {
-            const message = err instanceof Error ? err.message : 'Transfer failed';
+            let message = 'Transfer failed';
+            if (err && typeof err === 'object' && 'response' in err) {
+                const axiosErr = err;
+                const apiMsg = axiosErr.response?.data?.error?.message;
+                if (apiMsg) {
+                    message = apiMsg;
+                }
+            }
+            else if (err instanceof Error) {
+                message = err.message;
+            }
             showToast({ type: 'error', title: 'Transfer Failed', message });
             throw err;
         }

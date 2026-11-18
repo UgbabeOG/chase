@@ -102,7 +102,16 @@ export function useTransfer() {
       showToast({ type: 'success', title: 'Transfer Complete', message: `$${data.amount.toFixed(2)} transferred successfully` });
       return result;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Transfer failed';
+      let message = 'Transfer failed';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: { message?: string; code?: string } } } };
+        const apiMsg = axiosErr.response?.data?.error?.message;
+        if (apiMsg) {
+          message = apiMsg;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       showToast({ type: 'error', title: 'Transfer Failed', message });
       throw err;
     } finally {
